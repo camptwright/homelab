@@ -1,0 +1,225 @@
+# Homelab core stack - KAMRUI Pinova P1 (2C/16GB), Debian LXC on Proxmox
+# Profiles:
+#   core     - postgres, redis, litellm, cloudflared, ntfy        (always on)
+#   apps     - dashboard, miniflux, uptime-kuma, linkding, beszel  (tonight)
+#   adjutant - api, worker, beat                                   (after Phase 1 prompts)
+#   extras   - vaultwarden, actualbudget, whodb                    (optional)
+#   media    - jellyfin                                            (FUTURE, HP node; see SETUP.md)
+#
+# Usage: docker compose --profile core --profile apps up -d
+
+name: homelab
+
+networks:
+  homelab:
+
+volumes:
+  pgdata:
+  redisdata:
+  kuma:
+  linkding:
+  ntfy:
+  beszel:
+  vaultwarden:
+  actualbudget:
+
+x-small: &small
+  restart: unless-stopped
+  networks: [homelab]
+  logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
+
+services:
+  # ---------------------------------------------------------------- core ----
+  postgres:
+    <<: *small
+    profiles: [core]
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    mem_limit: 1536m
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 10s, retries: 5}
+
+  redis:
+    <<: *small
+    profiles: [core]
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    mem_limit: 384m
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 10s, retries: 5}
+
+  litellm:
+    <<: *small
+    profiles: [core]
+    image: ghcr.io/berriai/litellm:main-latest
+    command: ["--config", "/config/litellm-config.yaml", "--port", "4000"]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_API_KEY}
+    volumes: ["./litellm-config.yaml:/config/litellm-config.yaml:ro"]
+    mem_limit: 512m
+    ports: ["4000:4000"]   # LAN-reachable so OpenClaw/other LXCs can use it too
+
+  cloudflared:
+    <<: *small
+    profiles: [core]
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    mem_limit: 128m
+
+  ntfy:
+    <<: *small
+    profiles: [core]
+    image: binwiederhier/ntfy:latest
+    command: ["serve"]
+    environment:
+      NTFY_BASE_URL: https://ntfy.${DOMAIN}
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+      NTFY_ENABLE_LOGIN: "true"
+      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+    volumes: [ntfy:/var/lib/ntfy]
+    mem_limit: 128m
+
+  # ---------------------------------------------------------------- apps ----
+  dashboard:
+    <<: *small
+    profiles: [apps]
+    image: ghcr.io/camptwright/homelab-dashboard:latest   # built by Prompt A1
+    environment:
+      DATABASE_URL: postgresql://dashboard:${DASHBOARD_DB_PASSWORD}@postgres:5432/dashboard
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD}
+      ADJUTANT_API_URL: http://adjutant-api:8000
+      ADJUTANT_API_TOKEN: ${ADJUTANT_API_TOKEN}
+      MINIFLUX_URL: http://miniflux:8080
+      MINIFLUX_TOKEN: ${MINIFLUX_TOKEN}
+      FANTASY_EDGE_URL: ${FANTASY_EDGE_URL}
+      ARTICLE_INGEST_TOKEN: ${ARTICLE_INGEST_TOKEN}
+    depends_on: {postgres: {condition: service_healthy}}
+    mem_limit: 512m
+
+  miniflux:
+    <<: *small
+    profiles: [apps]
+    image: miniflux/miniflux:latest
+    environment:
+      DATABASE_URL: postgres://miniflux:${MINIFLUX_DB_PASSWORD}@postgres:5432/miniflux?sslmode=disable
+      RUN_MIGRATIONS: 1
+      CREATE_ADMIN: 1
+      ADMIN_USERNAME: camp
+      ADMIN_PASSWORD: ${MINIFLUX_ADMIN_PASSWORD}
+      BASE_URL: https://rss.${DOMAIN}
+    depends_on: {postgres: {condition: service_healthy}}
+    mem_limit: 256m
+
+  uptime-kuma:
+    <<: *small
+    profiles: [apps]
+    image: louislam/uptime-kuma:1
+    volumes: [kuma:/app/data]
+    mem_limit: 384m
+
+  linkding:
+    <<: *small
+    profiles: [apps]
+    image: sissbruecker/linkding:latest
+    environment:
+      LD_SUPERUSER_NAME: camp
+      LD_SUPERUSER_PASSWORD: ${LINKDING_PASSWORD}
+    volumes: [linkding:/etc/linkding/data]
+    mem_limit: 256m
+
+  beszel:
+    <<: *small
+    profiles: [apps]
+    image: henrygd/beszel:latest
+    volumes: [beszel:/beszel_data]
+    mem_limit: 128m
+
+  beszel-agent:
+    <<: *small
+    profiles: [apps]
+    image: henrygd/beszel-agent:latest
+    network_mode: host
+    environment:
+      LISTEN: "45876"
+      KEY: ${BESZEL_AGENT_KEY}
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"]
+    mem_limit: 64m
+
+  # ------------------------------------------------------------ adjutant ----
+  adjutant-api:
+    <<: *small
+    profiles: [adjutant]
+    image: ghcr.io/camptwright/adjutant:latest
+    command: ["api"]
+    env_file: [.env.adjutant]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 768m
+
+  adjutant-worker:
+    <<: *small
+    profiles: [adjutant]
+    image: ghcr.io/camptwright/adjutant:latest
+    command: ["worker"]
+    env_file: [.env.adjutant]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 1024m
+
+  adjutant-beat:
+    <<: *small
+    profiles: [adjutant]
+    image: ghcr.io/camptwright/adjutant:latest
+    command: ["beat"]
+    env_file: [.env.adjutant]
+    depends_on: {redis: {condition: service_healthy}}
+    mem_limit: 256m
+
+  # -------------------------------------------------------------- extras ----
+  vaultwarden:
+    <<: *small
+    profiles: [extras]
+    image: vaultwarden/server:latest
+    environment:
+      DOMAIN: https://vault.${DOMAIN}
+      SIGNUPS_ALLOWED: "false"   # set true for first signup, then back to false
+    volumes: [vaultwarden:/data]
+    mem_limit: 256m
+
+  actualbudget:
+    <<: *small
+    profiles: [extras]
+    image: actualbudget/actual-server:latest
+    volumes: [actualbudget:/data]
+    mem_limit: 256m
+
+  whodb:
+    <<: *small
+    profiles: [extras]
+    image: clidey/whodb:latest
+    mem_limit: 256m
+
+  # ------------------------------------------------- media (FUTURE: HP node) ----
+  # The R2544's AMD iGPU is a poor transcoder; run Jellyfin here only for
+  # direct-play testing. Real home is an HP node (i5-9500T Quick Sync).
+  jellyfin:
+    <<: *small
+    profiles: [media]
+    image: jellyfin/jellyfin:latest
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - /mnt/media:/media:ro
+    # devices: ["/dev/dri:/dev/dri"]   # uncomment on Intel for Quick Sync
+    mem_limit: 2048m

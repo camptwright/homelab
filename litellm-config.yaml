@@ -1,0 +1,42 @@
+# LiteLLM alias map. Adjutant, the dashboard, and OpenClaw all speak to
+# http://<kamrui>:4000/v1 with these aliases and never learn what backs them.
+#
+# TODAY: everything -> Anthropic API.
+# FUTURE (GPU node): move fast/worker/embed to Ollama by swapping the
+# commented blocks. Nothing downstream changes.
+
+model_list:
+  - model_name: fast
+    litellm_params:
+      model: anthropic/claude-haiku-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: worker
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: planner
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Embeddings: run the tiny CPU sidecar (SETUP.md Part B7) to keep the
+  # vector(768) schema; nomic-embed-text is fast even on the R2544.
+  - model_name: embed
+    litellm_params:
+      model: ollama/nomic-embed-text
+      api_base: http://ollama-embed:11434
+
+  # ---- FUTURE GPU NODE (uncomment, fix IP, delete Anthropic fast/worker) ----
+  # - model_name: fast
+  #   litellm_params: {model: ollama/qwen2.5:7b-instruct, api_base: http://10.89.0.30:11434}
+  # - model_name: worker
+  #   litellm_params: {model: ollama/qwen2.5:32b-instruct, api_base: http://10.89.0.30:11434}
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  drop_params: true
+  num_retries: 2
