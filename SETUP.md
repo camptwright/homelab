@@ -281,13 +281,25 @@ Skip for now: Nextcloud (heavy; Syncthing or plain SMB covers file sync at your 
 | Proxmox host | ~1.5GB |
 | Existing LXCs (wedding, Fantasy Edge, Los Ebanitos) | ~3GB |
 | docker-core LXC cap | 12GB, of which: |
-| core (pg, redis, litellm, cloudflared, ntfy, ollama-embed) | ~3.5GB |
-| apps (dashboard, miniflux, kuma, linkding, beszel) | ~1.5GB |
-| adjutant (api, worker, beat) | ~2GB |
-| extras (vaultwarden + whodb + actual) | ~0.7GB |
-| headroom | ~4GB |
+| core (pg 1536 + redis 384 + litellm 1536 + cloudflared 128 + ntfy 128 + ollama-embed 1024) | ~4.6GB |
+| apps (dashboard 512 + miniflux 256 + kuma 384 + linkding 256 + beszel 128 + agent 64) | ~1.6GB |
+| adjutant (api 768 + worker 1024 + beat 256) | ~2GB |
+| extras (vaultwarden + whodb + actual, 256 each) | ~0.75GB |
+| headroom | ~3GB |
 
-Tight but honest. If memory pressure appears: Los Ebanitos to Cloudflare Pages (C3) and defer Karakeep/Paperless to the cluster.
+Sum of `mem_limit` ceilings, not steady-state usage; actual draw is well under
+this (measured: litellm ~1.07GB, ollama-embed ~0.37GB, everything else small).
+
+Core grew from the original ~3.5GB estimate for two measured reasons: litellm
+needs 1536m (it SIGKILLs at 512m - see CLAUDE.md operational lessons), and the
+ollama-embed sidecar adds 1024m. Headroom is down to ~3GB, so the adjutant
+profile is the last thing that fits comfortably. If memory pressure appears:
+Los Ebanitos to Cloudflare Pages (C3) and defer Karakeep/Paperless to the
+cluster.
+
+Watch list (measured against ceiling, flag at >80%): litellm ~71%, linkding
+~74%. Neither is over yet, but both are close enough to check after any image
+bump.
 
 ## Backups (do not skip)
 
