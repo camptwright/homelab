@@ -61,7 +61,10 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_API_KEY}
     volumes: ["./litellm-config.yaml:/config/litellm-config.yaml:ro"]
-    mem_limit: 512m
+    # 512m SIGKILLs the proxy during startup (exit 137). Note OOMKilled reads
+    # false because Docker is nested in an unprivileged LXC and the cgroup OOM
+    # event never reaches Docker's state - trust exit 137, not the flag.
+    mem_limit: 1536m
     ports: ["4000:4000"]   # LAN-reachable so OpenClaw/other LXCs can use it too
 
   cloudflared:
