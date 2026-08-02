@@ -1,6 +1,7 @@
 # Homelab core stack - KAMRUI Pinova P1 (2C/16GB), Debian LXC on Proxmox
 # Profiles:
-#   core     - postgres, redis, litellm, cloudflared, ntfy        (always on)
+#   core     - postgres, redis, litellm, cloudflared, ntfy,
+#              ollama-embed                                       (always on)
 #   apps     - dashboard, miniflux, uptime-kuma, linkding, beszel  (tonight)
 #   adjutant - api, worker, beat                                   (after Phase 1 prompts)
 #   extras   - vaultwarden, actualbudget, whodb                    (optional)
@@ -22,6 +23,7 @@ volumes:
   beszel:
   vaultwarden:
   actualbudget:
+  ollamaembed:
 
 x-small: &small
   restart: unless-stopped
@@ -89,6 +91,16 @@ services:
       NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
     volumes: [ntfy:/var/lib/ntfy]
     mem_limit: 128m
+
+  # Embeddings sidecar (SETUP.md B7). Permanent home for the `embed` alias:
+  # pgvector memories are only comparable if every vector comes from the same
+  # model, and memory writes must not depend on the gaming PC being awake.
+  ollama-embed:
+    <<: *small
+    profiles: [core]
+    image: ollama/ollama:latest
+    volumes: [ollamaembed:/root/.ollama]
+    mem_limit: 1024m
 
   # ---------------------------------------------------------------- apps ----
   dashboard:
