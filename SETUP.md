@@ -83,7 +83,10 @@ source .env
 docker compose exec postgres psql -U postgres -c \
  "ALTER USER adjutant PASSWORD '${ADJUTANT_DB_PASSWORD}';
   ALTER USER dashboard PASSWORD '${DASHBOARD_DB_PASSWORD}';
-  ALTER USER miniflux PASSWORD '${MINIFLUX_DB_PASSWORD}';"
+  ALTER USER miniflux PASSWORD '${MINIFLUX_DB_PASSWORD}';
+  ALTER USER wellthread PASSWORD '${WELLTHREAD_DB_PASSWORD}';
+  ALTER USER authenticator PASSWORD '${AUTHENTICATOR_PASSWORD}';
+  ALTER USER supabase_auth_admin PASSWORD '${AUTH_ADMIN_PASSWORD}';"
 docker compose restart miniflux
 ```
 
@@ -283,9 +286,10 @@ Skip for now: Nextcloud (heavy; Syncthing or plain SMB covers file sync at your 
 | docker-core LXC cap | 12GB, of which: |
 | core (pg 1536 + redis 384 + litellm 1536 + cloudflared 128 + ntfy 128 + ollama-embed 1024) | ~4.6GB |
 | apps (dashboard 512 + miniflux 256 + kuma 384 + linkding 256 + beszel 128 + agent 64) | ~1.6GB |
+| wellthread (auth 192 + rest 256 + gateway 64 + web 512) | ~1GB |
 | adjutant (api 768 + worker 1024 + beat 256) | ~2GB |
 | extras (vaultwarden + whodb + actual, 256 each) | ~0.75GB |
-| headroom | ~3GB |
+| headroom | ~2GB |
 
 Sum of `mem_limit` ceilings, not steady-state usage; actual draw is well under
 this (measured: litellm ~1.07GB, ollama-embed ~0.37GB, everything else small).

@@ -170,6 +170,70 @@ services:
     volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"]
     mem_limit: 64m
 
+  # ----------------------------------------------------------- wellthread ----
+  # Self-hosted replacement for Supabase cloud: GoTrue (auth) + PostgREST
+  # (data API) against the shared Postgres, behind an nginx gateway that
+  # reproduces Supabase's URL layout. This keeps the Supabase JS client
+  # contract intact, so wellthread-web needs no data-layer rewrite.
+  # Deliberately omitted: realtime, storage, edge-runtime - the app uses none
+  # of them, and the edge functions were ported to Next.js routes.
+  wellthread-auth:
+    <<: *small
+    profiles: [apps]
+    image: supabase/gotrue:v2.177.0
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: https://wellthread.${DOMAIN}
+      GOTRUE_SITE_URL: https://wellthread.${DOMAIN}
+      GOTRUE_URI_ALLOW_LIST: https://wellthread.${DOMAIN}/**
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${AUTH_ADMIN_PASSWORD}@postgres:5432/wellthread?search_path=auth&sslmode=disable
+      # Must match PGRST_JWT_SECRET exactly or PostgREST rejects every token.
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      # Single-user instance: flip to "true" once the account exists.
+      GOTRUE_DISABLE_SIGNUP: "false"
+      # No SMTP configured yet, so confirmation mail cannot be delivered.
+      # Autoconfirm keeps signup working; revisit if this ever serves anyone
+      # other than Camp (see NEXT-STEPS.md).
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+    depends_on: {postgres: {condition: service_healthy}}
+    mem_limit: 192m
+
+  wellthread-rest:
+    <<: *small
+    profiles: [apps]
+    image: postgrest/postgrest:v12.2.3
+    environment:
+      # Logs in as `authenticator`, which has no rights of its own and
+      # SET ROLEs per-request from the JWT. Row isolation is enforced by the
+      # 70 RLS policies in the schema, not by this connection.
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_PASSWORD}@postgres:5432/wellthread
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      PGRST_JWT_AUD: authenticated
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on: {postgres: {condition: service_healthy}}
+    mem_limit: 256m
+
+  wellthread-gateway:
+    <<: *small
+    profiles: [apps]
+    image: nginx:1.27-alpine
+    volumes:
+      - ./wellthread-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [wellthread-auth, wellthread-rest]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      retries: 3
+
   # ------------------------------------------------------------ adjutant ----
   adjutant-api:
     <<: *small
