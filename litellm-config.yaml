@@ -1,42 +1,63 @@
 # LiteLLM alias map. Adjutant, the dashboard, and OpenClaw all speak to
 # http://<kamrui>:4000/v1 with these aliases and never learn what backs them.
 #
-# TODAY: everything -> Anthropic API.
-# FUTURE (GPU node): move fast/worker/embed to Ollama by swapping the
-# commented blocks. Nothing downstream changes.
+# CURRENT STATE: fast + worker run locally on the gaming PC
+# (9070 XT / Ollama-ROCm at 10.51.24.9) with automatic fallback to
+# Anthropic when the PC is off, asleep, or out of VRAM. planner stays on
+# Anthropic. embed stays on the KAMRUI CPU sidecar PERMANENTLY: embeddings
+# must come from one consistent model or pgvector memories become
+# incomparable, and memory writes must not depend on the PC being awake.
+#
+# FUTURE (dedicated AI node): change the two api_base IPs, resize worker
+# to the new VRAM. Nothing downstream changes.
 
 model_list:
+  # ---- fast: routing, classification, summaries ----
   - model_name: fast
+    litellm_params:
+      model: ollama_chat/qwen2.5:7b-instruct
+      api_base: http://10.51.24.9:11434
+      timeout: 60
+
+  - model_name: fast-cloud
     litellm_params:
       model: anthropic/claude-haiku-4-5
       api_key: os.environ/ANTHROPIC_API_KEY
 
+  # ---- worker: sub-agent tool loops ----
   - model_name: worker
+    litellm_params:
+      model: ollama_chat/qwen2.5:14b-instruct
+      api_base: http://10.51.24.9:11434
+      timeout: 120
+
+  - model_name: worker-cloud
     litellm_params:
       model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
+  # ---- planner: plan / replan / synthesize (always cloud) ----
   - model_name: planner
     litellm_params:
       model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
-  # Embeddings: run the tiny CPU sidecar (SETUP.md Part B7) to keep the
-  # vector(768) schema; nomic-embed-text is fast even on the R2544.
+  # ---- embed: KAMRUI CPU sidecar, permanent home ----
   - model_name: embed
     litellm_params:
       model: ollama/nomic-embed-text
       api_base: http://ollama-embed:11434
 
-  # ---- FUTURE GPU NODE (uncomment, fix IP, delete Anthropic fast/worker) ----
-  # - model_name: fast
-  #   litellm_params: {model: ollama/qwen2.5:7b-instruct, api_base: http://10.89.0.30:11434}
-  # - model_name: worker
-  #   litellm_params: {model: ollama/qwen2.5:32b-instruct, api_base: http://10.89.0.30:11434}
+router_settings:
+  fallbacks:
+    - fast: [fast-cloud]
+    - worker: [worker-cloud]
+  num_retries: 1            # one local retry, then fall back fast
+  allowed_fails: 3          # after 3 failures in the window...
+  cooldown_time: 120        # ...route straight to cloud for 2 min (no per-call wait on a dead PC)
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
 
 litellm_settings:
   drop_params: true
-  num_retries: 2

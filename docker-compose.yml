@@ -144,10 +144,11 @@ services:
     mem_limit: 128m
 
   beszel-agent:
-    <<: *small
     profiles: [apps]
     image: henrygd/beszel-agent:latest
+    restart: unless-stopped
     network_mode: host
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
     environment:
       LISTEN: "45876"
       KEY: ${BESZEL_AGENT_KEY}
