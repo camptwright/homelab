@@ -118,6 +118,11 @@ services:
       MINIFLUX_TOKEN: ${MINIFLUX_TOKEN}
       FANTASY_EDGE_URL: ${FANTASY_EDGE_URL}
       ARTICLE_INGEST_TOKEN: ${ARTICLE_INGEST_TOKEN}
+      BESZEL_URL: http://beszel:8090
+      BESZEL_API_EMAIL: ${BESZEL_API_EMAIL}
+      BESZEL_API_PASSWORD: ${BESZEL_API_PASSWORD}
+      UPTIME_KUMA_URL: http://uptime-kuma:3001
+      UPTIME_KUMA_STATUS_SLUG: dashboard-internal
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 512m
 
