@@ -109,6 +109,7 @@ services:
     image: ghcr.io/camptwright/homelab-dashboard:latest   # built by Prompt A1
     environment:
       DATABASE_URL: postgresql://dashboard:${DASHBOARD_DB_PASSWORD}@postgres:5432/dashboard
+      DOMAIN: ${DOMAIN}
       CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
       CF_ACCESS_AUD: ${CF_ACCESS_AUD}
       ADJUTANT_API_URL: http://adjutant-api:8000
