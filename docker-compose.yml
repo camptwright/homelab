@@ -157,6 +157,19 @@ services:
     volumes: [linkding:/etc/linkding/data]
     mem_limit: 256m
 
+  marketdesk:
+    <<: *small
+    profiles: [apps]
+    image: ghcr.io/camptwright/marketdesk:latest
+    environment:
+      DATABASE_URL: postgresql+asyncpg://markets:${MARKETS_DB_PASSWORD}@postgres:5432/markets
+      API_BEARER_TOKEN: ${MARKETS_API_TOKEN}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      ALPHAVANTAGE_API_KEY: ${ALPHAVANTAGE_API_KEY}
+      TZ: America/Chicago
+    depends_on: {postgres: {condition: service_healthy}}
+    mem_limit: 384m
+
   beszel:
     <<: *small
     profiles: [apps]

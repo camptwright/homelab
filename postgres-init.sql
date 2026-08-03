@@ -10,11 +10,13 @@ CREATE USER adjutant   WITH PASSWORD 'changeme';
 CREATE USER dashboard  WITH PASSWORD 'changeme';
 CREATE USER miniflux   WITH PASSWORD 'changeme';
 CREATE USER wellthread WITH PASSWORD 'changeme';
+CREATE USER markets    WITH PASSWORD 'changeme';
 
 CREATE DATABASE adjutant   OWNER adjutant;
 CREATE DATABASE dashboard  OWNER dashboard;
 CREATE DATABASE miniflux   OWNER miniflux;
 CREATE DATABASE wellthread OWNER wellthread;
+CREATE DATABASE markets    OWNER markets;
 
 -- ---------------------------------------------------------------- wellthread
 -- Self-hosted Supabase contract (GoTrue + PostgREST). PostgREST logs in as

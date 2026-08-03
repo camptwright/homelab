@@ -106,7 +106,7 @@ Approve the route in the Tailscale admin console, install Tailscale on laptop + 
 
 ### A7. First-login checklist (10 min)
 
-- **Uptime Kuma** (`status.<domain>`): create admin, add monitors: dashboard, rss, the wedding site URL, Los Ebanitos URL, Fantasy Edge health endpoint, `ntfy.<domain>`.
+- **Uptime Kuma** (`status.<domain>`): create admin, add monitors: dashboard, rss, the wedding site URL, Los Ebanitos URL, Fantasy Edge health endpoint, `ntfy.<domain>`, marketdesk's `http://marketdesk:8000/health` (internal-only, no tunnel hostname - same docker network as Kuma itself).
 - **ntfy**: `docker compose exec ntfy ntfy user add --role=admin camp`, subscribe to topic `homelab` in the phone app. Point Uptime Kuma notifications at `https://ntfy.<domain>/homelab`. Your infrastructure can now buzz your pocket.
 - **Miniflux** (`rss.<domain>`): log in (camp / MINIFLUX_ADMIN_PASSWORD), Settings > API keys > create, put it in `.env` as `MINIFLUX_TOKEN`. Add starter feeds: Hacker News frontpage, r/homelab and r/selfhosted (reddit .rss URLs), Simon Willison, the Self-Host newsletter, Anthropic news, Texas A&M MSAI announcements if they publish a feed.
 - **Beszel** (`beszel.<domain>`): create admin, Add System > localhost:45876, copy the key into `BESZEL_AGENT_KEY` in .env, `docker compose up -d beszel-agent`. CPU/RAM/disk/docker stats per container, at a fraction of Grafana's weight.
@@ -285,11 +285,11 @@ Skip for now: Nextcloud (heavy; Syncthing or plain SMB covers file sync at your 
 | Existing LXCs (wedding, Fantasy Edge, Los Ebanitos) | ~3GB |
 | docker-core LXC cap | 12GB, of which: |
 | core (pg 1536 + redis 384 + litellm 1536 + cloudflared 128 + ntfy 128 + ollama-embed 1024) | ~4.6GB |
-| apps (dashboard 512 + miniflux 256 + kuma 384 + linkding 256 + beszel 128 + agent 64) | ~1.6GB |
+| apps (dashboard 512 + miniflux 256 + kuma 384 + linkding 256 + beszel 128 + agent 64 + marketdesk 384) | ~2GB |
 | wellthread (auth 192 + rest 256 + gateway 64 + web 512) | ~1GB |
 | adjutant (api 768 + worker 1024 + beat 256) | ~2GB |
 | extras (vaultwarden + whodb + actual, 256 each) | ~0.75GB |
-| headroom | ~2GB |
+| headroom | ~1.6GB |
 
 Sum of `mem_limit` ceilings, not steady-state usage; actual draw is well under
 this (measured: litellm ~1.07GB, ollama-embed ~0.37GB, everything else small).
