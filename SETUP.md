@@ -130,34 +130,49 @@ docker compose pull dashboard && docker compose up -d dashboard
 
 ### B2. Adjutant on the KAMRUI
 
-1. Build Adjutant Phase 1 (adjutant repo, PROMPTS.md 1-9) - runnable entirely against this stack: the compose postgres already has the `adjutant` DB with pgvector, redis is up, LiteLLM is up.
-2. Run **Prompt B1** (PROMPTS-HOMELAB.md) to add the Dockerfile + GHCR workflow (no Kubernetes needed yet).
-3. Create `.env.adjutant` next to docker-compose.yml:
+Adjutant (`github.com/camptwright/adjutant`) is a single container: FastAPI
++ an in-process APScheduler reading its cron jobs from the `schedules`
+table, no Celery/Redis/worker/beat processes. Two agents exist today:
+`infra` (reads Uptime Kuma's public status page) and `markets` (reads
+marketdesk, posts briefs to the dashboard).
+
+1. `adjutant` role/database already exist in `postgres-init.sql`. Rotate
+   the placeholder password the same way as any other service (A5
+   pattern): `source .env` then `ALTER USER adjutant WITH PASSWORD
+   '$ADJUTANT_DB_PASSWORD';`.
+2. Create/verify `.env.adjutant` next to docker-compose.yml:
    ```
    DATABASE_URL=postgresql+asyncpg://adjutant:<pw>@postgres:5432/adjutant
-   REDIS_URL=redis://redis:6379/0
+   API_BEARER_TOKEN=<same as ADJUTANT_API_TOKEN in .env>
    LITELLM_BASE_URL=http://litellm:4000/v1
    LITELLM_API_KEY=<same as .env>
-   TELEGRAM_BOT_TOKEN=...
-   TELEGRAM_ALLOWED_USER_ID=...
-   PROXMOX_HOST=https://<proxmox-ip>:8006
-   PROXMOX_TOKEN_ID=adjutant@pve!readonly
-   PROXMOX_TOKEN_SECRET=...
-   API_BEARER_TOKEN=<ADJUTANT_API_TOKEN from .env>
+   AGENT_MODEL_ALIAS=planner
+   MARKETS_URL=http://marketdesk:8000
+   MARKETS_API_TOKEN=<same as MARKETS_API_TOKEN in .env>
+   DASHBOARD_INGEST_URL=http://dashboard:3000/api/ingest/articles
+   ARTICLE_INGEST_TOKEN=<same as ARTICLE_INGEST_TOKEN in .env>
+   UPTIME_KUMA_STATUS_URL=https://status.<domain>/api/status-page/<slug>
    ```
-   Proxmox token: Datacenter > Permissions > API Tokens > add for a user with PVEAuditor role only.
-4. `docker compose --profile adjutant up -d` then run migrations once:
-   `docker compose run --rm adjutant-api alembic upgrade head`
-5. Telegram smoke test from PROMPTS.md. The Infra agent now monitors the very box it runs on.
+   `PROXMOX_TOKEN_ID`/`PROXMOX_TOKEN_SECRET` (Datacenter > Permissions >
+   API Tokens, `PVEAuditor` role only) are for a future infra tool beyond
+   Uptime Kuma - not consumed by anything yet, so skip them for now.
+3. `docker compose --profile core --profile apps --profile adjutant up -d` then run migrations once (creates `tasks`/`runs`/`approvals`/`schedules` and seeds `premarket_brief`/`portfolio_recap`):
+   `docker run --rm --network homelab_homelab -e DATABASE_URL=... ghcr.io/camptwright/adjutant:latest alembic upgrade head`
+4. Smoke test: `curl -H "Authorization: Bearer $ADJUTANT_API_TOKEN" -d '{"goal":"Are any homelab services down?"}' http://<lxc-ip>:8000/task` (or through the dashboard's Adjutant tile Submit form), then check `/tasks/{id}` for a `completed` status and a real `Run` row.
 
 ### B3. Morning briefing page
 
 Two pieces, both tiny once B1 + B2 exist:
 
-1. Adjutant side: give the Research agent (or a dedicated `briefing` capability on it) a `miniflux_unread` tool that calls the Miniflux API (`/v1/entries?status=unread&limit=30`, token header) and add a schedule row:
+1. Adjutant side: register a new agent (or add a `miniflux_unread` tool to
+   `infra`, see adjutant repo's `src/agents/`) that calls the Miniflux API
+   (`/v1/entries?status=unread&limit=30`, token header), then seed a
+   schedule row (real column names - `schedules` has `name`/`cron`/`agent`/
+   `goal`/`enabled`, see adjutant's `alembic/versions/0002` for the exact
+   pattern the markets schedules use):
    ```sql
-   INSERT INTO schedules (name, cron, goal_template) VALUES
-   ('morning_briefing', '30 6 * * 1-5',
+   INSERT INTO schedules (name, cron, agent, goal) VALUES
+   ('morning_briefing', '30 6 * * 1-5', 'briefing',
     'Write the morning briefing: 5-8 top items from unread RSS with one-line
      takes, homelab health summary, and anything unusual from yesterday''s
      agent runs. Then mark included RSS items read. Post the briefing to the
@@ -287,17 +302,18 @@ Skip for now: Nextcloud (heavy; Syncthing or plain SMB covers file sync at your 
 | core (pg 1536 + redis 384 + litellm 1536 + cloudflared 128 + ntfy 128 + ollama-embed 1024) | ~4.6GB |
 | apps (dashboard 512 + miniflux 256 + kuma 384 + linkding 256 + beszel 128 + agent 64 + marketdesk 384) | ~2GB |
 | wellthread (auth 192 + rest 256 + gateway 64 + web 512) | ~1GB |
-| adjutant (api 768 + worker 1024 + beat 256) | ~2GB |
+| adjutant (single container, no Celery/Redis) | ~0.5GB |
 | extras (vaultwarden + whodb + actual, 256 each) | ~0.75GB |
-| headroom | ~1.6GB |
+| headroom | ~3.1GB |
 
 Sum of `mem_limit` ceilings, not steady-state usage; actual draw is well under
 this (measured: litellm ~1.07GB, ollama-embed ~0.37GB, everything else small).
 
 Core grew from the original ~3.5GB estimate for two measured reasons: litellm
 needs 1536m (it SIGKILLs at 512m - see CLAUDE.md operational lessons), and the
-ollama-embed sidecar adds 1024m. Headroom is down to ~3GB, so the adjutant
-profile is the last thing that fits comfortably. If memory pressure appears:
+ollama-embed sidecar adds 1024m. Adjutant turning out to be a single
+lightweight container rather than the originally-planned Celery 3-process
+shape recovered ~1.5GB of that headroom. If memory pressure appears anyway:
 Los Ebanitos to Cloudflare Pages (C3) and defer Karakeep/Paperless to the
 cluster.
 

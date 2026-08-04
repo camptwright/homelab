@@ -166,6 +166,13 @@ state.
 
 ## Prompt B1 - Adjutant Compose Deployment (run in the adjutant repo)
 
+**SUPERSEDED (2026-08-04):** Adjutant was ultimately built as a minimal
+single-container scaffold instead - FastAPI + an in-process APScheduler
+(no Celery, no Redis, no `worker`/`beat` processes), the same shape
+marketdesk uses. The prompt below is kept for history; the real
+deployment is documented in the adjutant repo's own README and in this
+repo's docker-compose.yml (single `adjutant` service, profile `adjutant`).
+
 ```
 Read CLAUDE.md. Add container deployment WITHOUT Kubernetes (that comes
 later as Prompt 13):

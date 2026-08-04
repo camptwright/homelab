@@ -112,11 +112,13 @@ services:
       DOMAIN: ${DOMAIN}
       CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
       CF_ACCESS_AUD: ${CF_ACCESS_AUD}
-      ADJUTANT_API_URL: http://adjutant-api:8000
+      ADJUTANT_API_URL: http://adjutant:8000
       ADJUTANT_API_TOKEN: ${ADJUTANT_API_TOKEN}
       MINIFLUX_URL: http://miniflux:8080
       MINIFLUX_TOKEN: ${MINIFLUX_TOKEN}
       FANTASY_EDGE_URL: ${FANTASY_EDGE_URL}
+      MARKETS_URL: http://marketdesk:8000
+      MARKETS_API_TOKEN: ${MARKETS_API_TOKEN}
       ARTICLE_INGEST_TOKEN: ${ARTICLE_INGEST_TOKEN}
       BESZEL_URL: http://beszel:8090
       BESZEL_API_EMAIL: ${BESZEL_API_EMAIL}
@@ -274,36 +276,17 @@ services:
       retries: 3
 
   # ------------------------------------------------------------ adjutant ----
-  adjutant-api:
+  # Single container, no Celery/Redis: FastAPI + an in-process APScheduler
+  # (jobs sourced from the `schedules` table) share one event loop, the
+  # same "no fork-safety concern" shape as marketdesk. Ad-hoc /task
+  # submissions run via FastAPI BackgroundTasks on that same loop.
+  adjutant:
     <<: *small
     profiles: [adjutant]
     image: ghcr.io/camptwright/adjutant:latest
-    command: ["api"]
     env_file: [.env.adjutant]
-    depends_on:
-      postgres: {condition: service_healthy}
-      redis: {condition: service_healthy}
-    mem_limit: 768m
-
-  adjutant-worker:
-    <<: *small
-    profiles: [adjutant]
-    image: ghcr.io/camptwright/adjutant:latest
-    command: ["worker"]
-    env_file: [.env.adjutant]
-    depends_on:
-      postgres: {condition: service_healthy}
-      redis: {condition: service_healthy}
-    mem_limit: 1024m
-
-  adjutant-beat:
-    <<: *small
-    profiles: [adjutant]
-    image: ghcr.io/camptwright/adjutant:latest
-    command: ["beat"]
-    env_file: [.env.adjutant]
-    depends_on: {redis: {condition: service_healthy}}
-    mem_limit: 256m
+    depends_on: {postgres: {condition: service_healthy}}
+    mem_limit: 512m
 
   # -------------------------------------------------------------- extras ----
   vaultwarden:
