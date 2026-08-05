@@ -1,0 +1,6 @@
+.DS_Store
+._*
+
+# Local runtime configuration and secrets.
+.env
+.env.adjutant
