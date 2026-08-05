@@ -12,6 +12,6 @@ digest without changing the currently deployed software.
   `wellthread-web` pending-profile exception.
 - [x] Pin resolvable Compose images as `tag@sha256:digest`.
 - [x] Add the pin test to GitHub Actions and document update/rollback policy.
-- [ ] Validate Bash, Compose, and all repository tests locally and on CI.
-- [ ] Install the committed Compose definition on CT110 without recreating the
+- [x] Validate Bash, Compose, and all repository tests locally and on CI.
+- [x] Install the committed Compose definition on CT110 without recreating the
   already healthy containers; verify runtime digests and health remain stable.
