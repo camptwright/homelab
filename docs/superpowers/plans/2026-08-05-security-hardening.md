@@ -10,10 +10,10 @@ without breaking cross-LXC LLM access or Beszel monitoring.
 - [x] Prove proposed controls with disposable LiteLLM and Beszel containers.
 - [x] Add a failing security-contract test.
 - [x] Add Compose controls, strong-key guidance, `SECURITY.md`, and CI coverage.
-- [ ] Validate the full repository suite and GitHub Actions.
+- [x] Validate the full repository suite and GitHub Actions.
 - [x] Tighten live secret-file and backup permissions. Rotate credentials
   exposed to the private hardening transcript as a separate coordinated task.
-- [ ] Recreate only LiteLLM and
+- [x] Recreate only LiteLLM and
   Beszel agent with rollback backups.
-- [ ] Verify authenticated LLM access, service health, Beszel telemetry, and
+- [x] Verify authenticated LLM access, service health, Beszel telemetry, and
   unchanged unrelated workloads; then advance the parent pin.
