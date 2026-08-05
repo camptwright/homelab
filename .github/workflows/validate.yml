@@ -20,6 +20,7 @@ jobs:
       - name: Run behavior and contract tests
         run: |
           bash tests/test-compose-env.sh
+          bash tests/test-image-pins.sh
           bash tests/test-backup-postgres.sh
           bash tests/test-restore-postgres.sh
 
