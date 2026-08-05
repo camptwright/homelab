@@ -5,6 +5,14 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 
+file_mode() {
+  if stat -c '%a' "$1" >/dev/null 2>&1; then
+    stat -c '%a' "$1"
+  else
+    stat -f '%Lp' "$1"
+  fi
+}
+
 mkdir -p "$test_root/bin" "$test_root/compose"
 cat >"$test_root/bin/docker" <<'FAKE_DOCKER'
 #!/usr/bin/env bash
@@ -31,8 +39,8 @@ dumps=("$test_root/backups"/pg-*.sql.gz)
 dump=${dumps[0]}
 gzip -t "$dump"
 (cd "$test_root/backups" && sha256sum -c "$(basename "$dump").sha256")
-[[ $(stat -f '%Lp' "$test_root/backups" 2>/dev/null || stat -c '%a' "$test_root/backups") == 700 ]]
-[[ $(stat -f '%Lp' "$dump" 2>/dev/null || stat -c '%a' "$dump") == 600 ]]
+[[ $(file_mode "$test_root/backups") == 700 ]]
+[[ $(file_mode "$dump") == 600 ]]
 [[ ! -e "$test_root/backups/.pg-"*'.tmp' ]]
 
 printf 'backup behavior verified\n'
