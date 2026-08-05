@@ -5,6 +5,7 @@ umask 077
 
 backup_dir=${BACKUP_DIR:-/opt/backups/postgres}
 container=${RESTORE_CONTAINER:-homelab-postgres-restore-test-$$}
+restore_user=${RESTORE_USER:-restore_admin}
 dump=${1:-}
 
 if [[ -z "$dump" ]]; then
@@ -40,12 +41,13 @@ docker run -d \
   --name "$container" \
   --tmpfs /var/lib/postgresql/data \
   -e POSTGRES_HOST_AUTH_METHOD=trust \
+  -e POSTGRES_USER="$restore_user" \
   pgvector/pgvector:pg16 >/dev/null
 container_started=true
 
 ready=false
 for _ in $(seq 1 30); do
-  if docker exec "$container" pg_isready -U postgres >/dev/null 2>&1; then
+  if docker exec "$container" pg_isready -U "$restore_user" >/dev/null 2>&1; then
     ready=true
     break
   fi
@@ -58,9 +60,9 @@ if [[ "$ready" != true ]]; then
 fi
 
 gzip -cd "$dump" | \
-  docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U postgres >/dev/null
+  docker exec -i "$container" psql -v ON_ERROR_STOP=1 -U "$restore_user" >/dev/null
 
-databases=$(docker exec "$container" psql -At -U postgres -c \
+databases=$(docker exec "$container" psql -At -U "$restore_user" -c \
   "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname")
 
 for expected in adjutant dashboard markets miniflux wellthread; do

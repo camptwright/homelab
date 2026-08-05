@@ -17,18 +17,21 @@ set -Eeuo pipefail
 
 case "${1:-}" in
   run)
-    [[ "$*" == *'--tmpfs /var/lib/postgresql/data'* ]]
-    [[ "$*" == *'pgvector/pgvector:pg16'* ]]
+    if [[ "$*" != *'--tmpfs /var/lib/postgresql/data'* ||
+          "$*" != *'-e POSTGRES_USER=restore_admin'* ||
+          "$*" != *'pgvector/pgvector:pg16'* ]]; then
+      exit 64
+    fi
     touch "$DOCKER_STATE"
     printf 'fake-container-id\n'
     ;;
   exec)
-    if [[ "$*" == *'pg_isready -U postgres'* ]]; then
+    if [[ "$*" == *'pg_isready -U restore_admin'* ]]; then
       [[ -e "$DOCKER_STATE" ]]
-    elif [[ "$*" == *'psql -v ON_ERROR_STOP=1 -U postgres'* ]]; then
+    elif [[ "$*" == *'psql -v ON_ERROR_STOP=1 -U restore_admin'* ]]; then
       [[ " $* " == *' -i '* ]]
       grep -q 'SELECT 1;' /dev/stdin
-    elif [[ "$*" == *'psql -At -U postgres'* ]]; then
+    elif [[ "$*" == *'psql -At -U restore_admin'* ]]; then
       printf '%s\n' adjutant dashboard markets miniflux wellthread
     else
       exit 64
@@ -45,13 +48,13 @@ esac
 FAKE_DOCKER
 chmod 0755 "$test_root/bin/docker"
 
-output=$(
-  PATH="$test_root/bin:$PATH" \
-    BACKUP_DIR="$test_root/backups" \
-    DOCKER_STATE="$test_root/container-running" \
-    RESTORE_CONTAINER="restore-test-fixture" \
-    "$repo_root/scripts/restore-test-postgres.sh" "$dump"
-)
+PATH="$test_root/bin:$PATH" \
+  BACKUP_DIR="$test_root/backups" \
+  DOCKER_STATE="$test_root/container-running" \
+  RESTORE_CONTAINER="restore-test-fixture" \
+  "$repo_root/scripts/restore-test-postgres.sh" "$dump" >"$test_root/output"
+
+output=$(<"$test_root/output")
 
 [[ "$output" == *"restore verified: $dump"* ]]
 [[ ! -e "$test_root/container-running" ]]
