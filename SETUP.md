@@ -1,6 +1,13 @@
-# SETUP.md - Homelab on the KAMRUI, Tonight
+# Homelab Provisioning and Recovery
 
-Everything runs on the KAMRUI Pinova P1 (2C/16GB/256GB) under Proxmox. Structure is deliberately migration-ready: when the HP nodes arrive, the compose stack lifts onto k3s (K8S-CLUSTER-GUIDE.md); when the GPU node arrives, one LiteLLM config edit moves inference local.
+This is the rebuild/reference runbook for the KAMRUI Pinova P1
+(2C/16GB/256GB) under Proxmox. The stack is already deployed; use
+`README.md` for current state and daily operations, and `NEXT-STEPS.md` for
+unfinished work. Checkboxes below describe a fresh installation, not the live
+host's completion status.
+
+The structure remains migration-ready: future HP nodes can take the Compose
+workloads onto k3s, and a future GPU node changes inference through LiteLLM.
 
 **Repo layout expected:**
 ```
@@ -8,6 +15,8 @@ homelab/            this repo: docker-compose.yml, .env, litellm-config.yaml,
                     postgres-init.sql, SETUP.md, PROMPTS-HOMELAB.md
 adjutant/           the agent system (its own repo, PROMPTS.md 1-9)
 homelab-dashboard/  admin dashboard (created by Prompt A1)
+marketdesk/         market data API (its own repo)
+fantasy-edge/       separate CT100 service (its own repo and stack)
 ```
 
 ---
@@ -48,7 +57,7 @@ docker --version && docker compose version
 
 ```bash
 mkdir -p /opt && cd /opt
-git clone https://github.com/camptwright/homelab.git && cd homelab
+git clone git@github.com:camptwright/homelab.git && cd homelab
 cp .env.example .env
 # fill .env; generate every password with: openssl rand -hex 24
 ```
@@ -67,7 +76,10 @@ cp .env.example .env
    | `ntfy.<domain>` | `http://ntfy:80` |
    | `beszel.<domain>` | `http://beszel:8090` |
 4. **Zero Trust > Access > Applications > Add application** (Self-hosted):
-   - Application domain: `admin.<domain>` (repeat this step for each hostname above; you can reuse one policy group)
+   - Application domain: `admin.<domain>` (repeat for `rss`, `status`,
+     `links`, and `beszel`; you can reuse one policy group). Do **not** put
+     ntfy behind Access: its phone client uses ntfy's own deny-all/user auth
+     and cannot complete the browser login.
    - Policy: Allow, Include > Emails > your Gmail. Nothing else.
    - Identity provider: the default one-time PIN works tonight; add Google login (Settings > Authentication) when convenient.
 5. Open the application's **Overview** page and copy the **Application Audience (AUD) tag** into `CF_ACCESS_AUD`, and your team domain (`<team>.cloudflareaccess.com`) into `CF_ACCESS_TEAM_DOMAIN`. The dashboard verifies the Access JWT on every request with these; that is what makes the login real rather than decorative, even if someone reaches the container some other way.
@@ -84,6 +96,7 @@ docker compose exec postgres psql -U postgres -c \
  "ALTER USER adjutant PASSWORD '${ADJUTANT_DB_PASSWORD}';
   ALTER USER dashboard PASSWORD '${DASHBOARD_DB_PASSWORD}';
   ALTER USER miniflux PASSWORD '${MINIFLUX_DB_PASSWORD}';
+  ALTER USER markets PASSWORD '${MARKETS_DB_PASSWORD}';
   ALTER USER wellthread PASSWORD '${WELLTHREAD_DB_PASSWORD}';
   ALTER USER authenticator PASSWORD '${AUTHENTICATOR_PASSWORD}';
   ALTER USER supabase_auth_admin PASSWORD '${AUTH_ADMIN_PASSWORD}';"
@@ -109,7 +122,11 @@ Approve the route in the Tailscale admin console, install Tailscale on laptop + 
 - **Uptime Kuma** (`status.<domain>`): create admin, add monitors: dashboard, rss, the wedding site URL, Los Ebanitos URL, Fantasy Edge health endpoint, `ntfy.<domain>`, marketdesk's `http://marketdesk:8000/health` (internal-only, no tunnel hostname - same docker network as Kuma itself).
 - **ntfy**: `docker compose exec ntfy ntfy user add --role=admin camp`, subscribe to topic `homelab` in the phone app. Point Uptime Kuma notifications at `https://ntfy.<domain>/homelab`. Your infrastructure can now buzz your pocket.
 - **Miniflux** (`rss.<domain>`): log in (camp / MINIFLUX_ADMIN_PASSWORD), Settings > API keys > create, put it in `.env` as `MINIFLUX_TOKEN`. Add starter feeds: Hacker News frontpage, r/homelab and r/selfhosted (reddit .rss URLs), Simon Willison, the Self-Host newsletter, Anthropic news, Texas A&M MSAI announcements if they publish a feed.
-- **Beszel** (`beszel.<domain>`): create admin, Add System > localhost:45876, copy the key into `BESZEL_AGENT_KEY` in .env, `docker compose up -d beszel-agent`. CPU/RAM/disk/docker stats per container, at a fraction of Grafana's weight.
+- **Beszel** (`beszel.<domain>`): create the hub admin and add the CT110
+  system at `localhost:45876`. `BESZEL_AGENT_KEY` must be the hub's actual SSH
+  public key, not the system UUID/token shown in the UI. The recovery procedure
+  for deriving it from the persisted hub key is in `CLAUDE.md`; then recreate
+  only `beszel-agent`.
 - **Linkding** (`links.<domain>`): log in, install the browser extension, done.
 
 **Tonight's stack is complete here.** Parts B-E are the build-out.
@@ -119,6 +136,9 @@ Approve the route in the Tailscale admin console, install Tailscale on laptop + 
 ## Part B - Service Build-Out
 
 ### B1. Admin dashboard shell
+
+**Implemented and live.** The prompt is retained as build history; the
+dashboard repository and `README.md` describe the deployed behavior.
 
 Run **Prompt A1** (PROMPTS-HOMELAB.md) in a new `homelab-dashboard` repo, push, let Actions build the image, then:
 
@@ -130,11 +150,12 @@ docker compose pull dashboard && docker compose up -d dashboard
 
 ### B2. Adjutant on the KAMRUI
 
-Adjutant (`github.com/camptwright/adjutant`) is a single container: FastAPI
+**Implemented and live.** Adjutant (`github.com/camptwright/adjutant`) is a single container: FastAPI
 + an in-process APScheduler reading its cron jobs from the `schedules`
-table, no Celery/Redis/worker/beat processes. Two agents exist today:
-`infra` (reads Uptime Kuma's public status page) and `markets` (reads
-marketdesk, posts briefs to the dashboard).
+table, no Celery/Redis/worker/beat processes. Three agents exist today:
+`infra` (reads Uptime Kuma's public status page), `markets` (reads
+Marketdesk and posts briefs), and `fantasy` (reads Fantasy Edge and posts
+briefs). Markets and fantasy tools cannot execute trades or bets.
 
 1. `adjutant` role/database already exist in `postgres-init.sql`. Rotate
    the placeholder password the same way as any other service (A5
@@ -146,9 +167,10 @@ marketdesk, posts briefs to the dashboard).
    API_BEARER_TOKEN=<same as ADJUTANT_API_TOKEN in .env>
    LITELLM_BASE_URL=http://litellm:4000/v1
    LITELLM_API_KEY=<same as .env>
-   AGENT_MODEL_ALIAS=planner
+   AGENT_MODEL_ALIAS=worker
    MARKETS_URL=http://marketdesk:8000
    MARKETS_API_TOKEN=<same as MARKETS_API_TOKEN in .env>
+   FANTASY_EDGE_URL=http://<fantasy-edge-host>:8000
    DASHBOARD_INGEST_URL=http://dashboard:3000/api/ingest/articles
    ARTICLE_INGEST_TOKEN=<same as ARTICLE_INGEST_TOKEN in .env>
    UPTIME_KUMA_STATUS_URL=https://status.<domain>/api/status-page/<slug>
@@ -156,8 +178,10 @@ marketdesk, posts briefs to the dashboard).
    `PROXMOX_TOKEN_ID`/`PROXMOX_TOKEN_SECRET` (Datacenter > Permissions >
    API Tokens, `PVEAuditor` role only) are for a future infra tool beyond
    Uptime Kuma - not consumed by anything yet, so skip them for now.
-3. `docker compose --profile core --profile apps --profile adjutant up -d` then run migrations once (creates `tasks`/`runs`/`approvals`/`schedules` and seeds `premarket_brief`/`portfolio_recap`):
-   `docker run --rm --network homelab_homelab -e DATABASE_URL=... ghcr.io/camptwright/adjutant:latest alembic upgrade head`
+3. `docker compose --profile core --profile apps --profile adjutant up -d`
+   then run migrations once (creates `tasks`/`runs`/`approvals`/`schedules`
+   and seeds `premarket_brief`, `portfolio_recap`, and `fantasy_recap`):
+   `docker compose --profile adjutant run --rm adjutant alembic upgrade head`.
 4. Smoke test: `curl -H "Authorization: Bearer $ADJUTANT_API_TOKEN" -d '{"goal":"Are any homelab services down?"}' http://<lxc-ip>:8000/task` (or through the dashboard's Adjutant tile Submit form), then check `/tasks/{id}` for a `completed` status and a real `Run` row.
 
 ### B3. Morning briefing page
@@ -182,12 +206,14 @@ Two pieces, both tiny once B1 + B2 exist:
 
 ### B4. OpenClaw article archive
 
-The dashboard exposes `POST /api/articles` (bearer `ARTICLE_INGEST_TOKEN`, JSON: title, body_markdown, source, tags). Wiring OpenClaw:
+The dashboard exposes `POST /api/ingest/articles` (bearer
+`ARTICLE_INGEST_TOKEN`, JSON: title, body_markdown, source, tags). Wiring
+OpenClaw:
 
 1. Point your OpenClaw instance's model config at LiteLLM (`http://<kamrui-ip>:4000/v1`) so its usage rides the same aliases and shows in the same spend accounting.
 2. Wherever OpenClaw's write-up job runs (cron/heartbeat), end it with:
    ```bash
-   curl -s -X POST https://admin.<domain>/api/articles \
+   curl -s -X POST https://admin.<domain>/api/ingest/articles \
      -H "Authorization: Bearer $ARTICLE_INGEST_TOKEN" \
      -H "Content-Type: application/json" \
      -d "$(jq -n --arg t "$TITLE" --arg b "$BODY" \
@@ -208,19 +234,13 @@ Phase-able, safe by construction (nothing can move money):
 
 Prompt A6: courses table (MSAI course code, name, term), deadlines with type (assignment/exam/registration), a compact kanban (todo/doing/done), and an ICS export URL you can subscribe to from Google Calendar. Seed it with the August term as soon as syllabi drop. The briefing job includes "due in the next 7 days" once this exists.
 
-### B7. Embedding sidecar (needed before Adjutant Phase 2)
+### B7. Embedding sidecar
 
-Adjutant's memory layer wants `nomic-embed-text` at 768 dims. CPU is fine for embeddings even on the R2544:
+**Implemented and live.** `docker-compose.yml` owns the sidecar definition;
+do not copy a second YAML block from this runbook. Adjutant memory uses
+`nomic-embed-text` at 768 dimensions, and LiteLLM routes the `embed` alias to
+this CPU sidecar so stored vectors remain comparable.
 
-```yaml
-# add under services:, profile [core]
-  ollama-embed:
-    <<: *small
-    profiles: [core]
-    image: ollama/ollama:latest
-    volumes: [ollamaembed:/root/.ollama]
-    mem_limit: 1024m
-```
 ```bash
 docker compose up -d ollama-embed
 docker compose exec ollama-embed ollama pull nomic-embed-text
@@ -229,7 +249,11 @@ docker compose exec ollama-embed ollama pull nomic-embed-text
 
 ### B8. Fantasy cockpit
 
-Prompt A7 proxies the Fantasy Edge API through the dashboard (server-side, using `FANTASY_EDGE_URL`, so nothing about your betting-value data is exposed beyond Access). Tiles: current roster, this week's top probability edges, bet_signals output, and the Fantasy agent's weekly report once Phase 3 lands. Season note: drafts are in August; prioritize this tile in early August.
+**Implemented and live.** The dashboard reads Fantasy Edge server-side through
+`FANTASY_EDGE_URL`. Its current table uses real `/props` data and computes
+implied probability client-side; model probability stays unavailable until
+Fantasy Edge has a projection pipeline. The Fantasy agent publishes articles
+from that same read-only data source.
 
 ---
 

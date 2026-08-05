@@ -9,17 +9,18 @@ Domain: **camptwright.com**, DNS on Cloudflare. Public entry is exclusively via 
 ## Files
 
 ```
+README.md             canonical current architecture + operations entry point
 docker-compose.yml     the whole stack, organized by compose profiles
 .env                   secrets + settings (NEVER commit; .env.example is the contract)
 .env.adjutant          Adjutant's env contract (consumed by the adjutant profile)
 litellm-config.yaml    model alias map (fast/worker/planner/embed)
 postgres-init.sql      first-boot DB/user creation (placeholder passwords;
                        SETUP.md A5 rotates them from .env via ALTER USER)
-SETUP.md               the runbook: tonight path, per-service build-out,
-                       existing-app integration, extras, future-node plans
-PROMPTS-HOMELAB.md     Claude Code prompt sequences (dashboard A1-A7,
-                       adjutant deploy B1, future-node stubs F1-F2)
-K8S-CLUSTER-GUIDE.md   the future: Proxmox cluster + k3s when HP nodes arrive
+NEXT-STEPS.md          unfinished work only, ordered by operational value
+SETUP.md               provisioning, rebuild, and recovery reference
+IMAGE-PINS.md          immutable image update and rollback policy
+PROMPTS-HOMELAB.md     historical implementation prompts, not a live runbook
+K8S-CLUSTER-GUIDE.md   unexecuted Proxmox/k3s plan for future HP nodes
 ```
 
 ## Architecture Rules (do not violate)
@@ -37,7 +38,7 @@ K8S-CLUSTER-GUIDE.md   the future: Proxmox cluster + k3s when HP nodes arrive
 - `beszel-agent` uses `network_mode: host` and therefore cannot inherit the `&small` anchor (which sets `networks:`). It is written out longhand. Do not "clean this up".
 - Postgres healthcheck has `start_period: 90s` because first init on 2 cores exceeds the default budget. Keep it.
 - The A5 password rotation requires `source .env` in the same shell first; running the ALTER USER block with unset vars CLEARS the passwords (postgres treats empty string as "remove password"). The runbook's echo sanity check exists for this reason.
-- The `dashboard` service sits in profile `pending` until its image exists on GHCR (a missing GHCR image returns "denied", and one failed pull interrupts every parallel pull in the same `up`). Flip to `apps` after Prompt A1's first successful Actions build, and either make the package public or `docker login ghcr.io` on the LXC.
+- `wellthread-web` is the sole service in profile `pending`: its GHCR package does not exist or is not anonymously pullable. The dashboard, Marketdesk, and Adjutant packages are public, digest-pinned, and live. Do not move Wellthread web to `apps` until its source-SHA image can be pinned and pulled.
 - Wiping `homelab_pgdata` is the correct fix for a failed FIRST init only. Once real data exists, never suggest volume removal as a fix; restore from the nightly pg_dumpall instead.
 - **`net0` must be `ip6=auto`, never `ip6=dhcp`.** With `ip6=dhcp`, `ifup` blocks on a DHCPv6 Solicit that nothing on this LAN answers; `networking.service` hits its start timeout, is killed, and eth0 never gets its **IPv4** lease either. Symptom: `ip route` shows only the docker bridges, `ping` says "Network is unreachable", and every container logs `[Errno -3] Temporary failure in name resolution`. Fix: `pct set 110 -net0 ...,ip6=auto,...` then `systemctl restart networking` (Proxmox rewrites `/etc/network/interfaces` on config change).
 - **Docker is nested in an unprivileged LXC, so the cgroup OOM event never reaches Docker.** A memory-killed container reports `OOMKilled=false`, and `docker inspect` can even show `ExitCode=0` because it races the restart. The only reliable signal is running the service in the foreground (`docker compose up <svc>`, no `-d`) and reading the real exit code: **137 = 128+9 = SIGKILL = out of memory**. Do not trust the `OOMKilled` flag on this host.
@@ -77,13 +78,18 @@ docker compose up -d                      # COMPOSE_PROFILES=core,apps via .env
 docker compose ps                         # health overview
 docker compose logs <svc> --tail 30       # first move for any failure
 docker compose config >/dev/null          # validate after editing compose
-docker compose pull <svc> && docker compose up -d <svc>   # update one service
+docker compose pull <svc>                 # verifies the committed digest exists
+# Follow IMAGE-PINS.md before changing a digest or recreating a service.
 docker compose exec postgres psql -U postgres             # DB shell
-# nightly backup (also in cron):
-docker compose exec -T postgres pg_dumpall -U postgres | gzip > /opt/backups/pg-$(date +%F).sql.gz
+systemctl status homelab-postgres-backup.timer             # nightly backup schedule
+/opt/homelab/scripts/restore-test-postgres.sh              # disposable restore test
 ```
 
-## Current State / Roadmap
+## Verified Implementation History
+
+This section records why the deployed shape differs from the original prompts.
+For current architecture use `README.md`; for unfinished work use
+`NEXT-STEPS.md`. Do not add roadmap items here.
 
 - DONE: core + apps running on the KAMRUI; tunnel + Access verified on camptwright.com; Kuma/Beszel/ntfy initialized. `dashboard` image is published and the service is live in profile `apps`.
 - DONE: **LLM routing is local-first.** `fast` -> `qwen2.5:7b-instruct` and `worker` -> `qwen2.5:14b-instruct` run on the gaming PC (Ollama-ROCm, `http://10.51.24.9:11434`), with `fast-cloud`/`worker-cloud` Anthropic fallbacks and router cooldowns. `planner` is always cloud. `embed` -> the `ollama-embed` CPU sidecar on the KAMRUI, verified returning 768-dim vectors; that stays local permanently so pgvector memories remain comparable and memory writes never depend on the PC being awake.
@@ -93,6 +99,3 @@ docker compose exec -T postgres pg_dumpall -U postgres | gzip > /opt/backups/pg-
 - DONE: **marketdesk exists, is deployed, and is live** (`github.com/camptwright/marketdesk`) - quotes/watchlist/positions/history API, own `markets` Postgres db/user, `mem_limit: 384m`, profile `apps`. Full E2E-tested against real yfinance data.
 - DONE: **homelab-dashboard's Stocks tile** (`/stocks`) consumes marketdesk for real - portfolio summary, watchlist with sparklines, per-symbol detail drawer, positions editor, and the `source=markets` article slot. Home tile shows today's $/% change, top movers, staleness badge.
 - DONE: **homelab-dashboard's Fantasy tile** (`/fantasy`) corrected against the real deployed Fantasy Edge API (the original scaffold assumed an endpoint that never existed) - sources the edges table from real `/props` data, computes implied probability client-side, shows model probability as "—" until Fantasy Edge has a projection pipeline. `FANTASY_EDGE_URL` is fixed and pointed at the real CT100 host.
-- NEXT: flip `adjutant` from a manually-built image to `--profile adjutant` against the real `ghcr.io/camptwright/adjutant:latest` once GHCR package visibility is confirmed - the same pull-`unauthorized`-so-build-from-source-on-the-LXC workaround was needed for `dashboard`, `marketdesk`, and `adjutant` alike; make each package public via the GitHub UI (or fix `gh auth refresh` scope) and test a plain `docker compose pull` before trusting future redeploys. Proxmox integration (a real infra tool beyond Uptime Kuma) still needs a hand-made API token (PVEAuditor); Telegram interface was dropped from this scaffold's scope entirely, not just deferred.
-- THEN: morning briefing schedule for non-markets/non-fantasy sources, OpenClaw ingest wiring, Fantasy Edge's own team-identity reconciliation (its constraint #24 - `/rankings/{sport}` stays empty until historical and live-synced Team rows share identity; filed but not started, see `fantasy-edge/CLAUDE.md`). Miniflux needs first login (user `camp`, password in `.env` as `MINIFLUX_ADMIN_PASSWORD`) then an API key into `MINIFLUX_TOKEN`; Beszel needs its agent key into `BESZEL_AGENT_KEY`.
-- FUTURE: HP EliteDesk nodes -> K8S-CLUSTER-GUIDE.md + Prompt F1 migration; custom AI node -> Prompt F2 LiteLLM cutover; Jellyfin on an Intel node.

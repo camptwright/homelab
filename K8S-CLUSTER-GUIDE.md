@@ -1,5 +1,11 @@
 # Homelab Kubernetes Cluster + Adjutant Deployment Guide
 
+> **Future design, not an executed runbook.** No HP-node cluster exists yet.
+> Revalidate Proxmox, Ubuntu, k3s, kube-vip, MetalLB, CloudNativePG, and image
+> versions against current upstream documentation before running these steps.
+> The live CT110 Compose stack remains authoritative until a separately tested
+> migration and rollback plan is approved.
+
 Proxmox cluster across the KAMRUI Pinova P1 and 2-3 HP EliteDesk 800 G5 Minis, k3s Kubernetes in VMs on the HP nodes, and the Adjutant agent stack deployed on top.
 
 Written for 3 HP nodes (the ideal: HA control plane). Every place the 2-node variant differs is marked **[2-HP variant]**.

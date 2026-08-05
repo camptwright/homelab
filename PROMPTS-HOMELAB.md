@@ -1,8 +1,20 @@
-# PROMPTS-HOMELAB.md - Claude Code Build Sequence
+# Historical Implementation Prompts
 
-Prompts A1-A7 build the admin dashboard (new repo `homelab-dashboard`).
-Prompt B1 runs in the `adjutant` repo. F1-F2 are future-node stubs.
-Run in order; A2-A7 can be reordered after A1. Commit between prompts.
+This file records the prompts that originally shaped the project. It is not a
+current runbook: A1-A7 and B1 have already been implemented, and several
+assumptions in their prose were corrected during real deployment. Use the
+application repositories for current behavior, `README.md` for the deployed
+architecture, `SETUP.md` for rebuilds, and `NEXT-STEPS.md` for open work.
+
+| Prompt group | Status | Current authority |
+|---|---|---|
+| A1-A7 dashboard | Implemented | `homelab-dashboard` source and README |
+| B1 Adjutant | Superseded by a single-container design | `adjutant` source and README |
+| F1 cluster migration | Future concept | `K8S-CLUSTER-GUIDE.md` after revalidation |
+| F2 GPU cutover | Future concept | `litellm-config.yaml` plus a future canary plan |
+
+Do not rerun an A/B prompt against a live repository. Treat it as design
+history when explaining why a feature exists.
 
 ---
 
