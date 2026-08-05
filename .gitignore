@@ -4,3 +4,5 @@
 # Local runtime configuration and secrets.
 .env
 .env.adjutant
+.env.bak*
+.env.*.bak*

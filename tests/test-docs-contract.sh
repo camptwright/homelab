@@ -8,6 +8,7 @@ required_docs=(
   NEXT-STEPS.md
   SETUP.md
   IMAGE-PINS.md
+  SECURITY.md
   CLAUDE.md
   PROMPTS-HOMELAB.md
   K8S-CLUSTER-GUIDE.md

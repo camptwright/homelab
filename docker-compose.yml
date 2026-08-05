@@ -59,6 +59,12 @@ services:
     <<: *small
     profiles: [core]
     image: ghcr.io/berriai/litellm:main-latest@sha256:d1fc1c122e2c1a0cec2b00540b220ff0d2682842758eb8bc64e373a1aedfec7e
+    user: "65532:65532"   # image-provided nonroot account
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
     command: ["--config", "/config/litellm-config.yaml", "--port", "4000"]
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
@@ -68,7 +74,15 @@ services:
     # false because Docker is nested in an unprivileged LXC and the cgroup OOM
     # event never reaches Docker's state - trust exit 137, not the flag.
     mem_limit: 1536m
-    ports: ["4000:4000"]   # LAN-reachable so OpenClaw/other LXCs can use it too
+    # IPv4 LAN-reachable for other LXCs. No IPv6 publish and no tunnel route.
+    # The master key still crosses the trusted private LAN over HTTP; SECURITY.md.
+    ports: ["0.0.0.0:4000:4000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   cloudflared:
     <<: *small
@@ -184,11 +198,18 @@ services:
     profiles: [apps]
     image: henrygd/beszel-agent:latest@sha256:8874e2c53f9de5e063a6a80d6b617e20fa593ac5dc4eb4c6ce1f912f510f38f8
     restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
     network_mode: host
     logging: {driver: json-file, options: {max-size: "10m", max-file: "3"}}
     environment:
       LISTEN: "45876"
       KEY: ${BESZEL_AGENT_KEY}
+    # :ro protects the socket path, not the Docker API. This remains
+    # root-equivalent daemon trust by explicit acceptance; see SECURITY.md.
     volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"]
     mem_limit: 64m
 

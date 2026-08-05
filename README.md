@@ -80,6 +80,7 @@ recoverable backup and validating them in place.
 | [NEXT-STEPS.md](NEXT-STEPS.md) | Unfinished work, ordered by priority |
 | [SETUP.md](SETUP.md) | Provisioning, rebuild, and recovery reference |
 | [IMAGE-PINS.md](IMAGE-PINS.md) | Container update and rollback procedure |
+| [SECURITY.md](SECURITY.md) | Trust boundaries, mitigations, and accepted residual risk |
 | [CLAUDE.md](CLAUDE.md) | Durable implementation rules and learned failure modes |
 | [PROMPTS-HOMELAB.md](PROMPTS-HOMELAB.md) | Historical build prompts; not current instructions |
 | [K8S-CLUSTER-GUIDE.md](K8S-CLUSTER-GUIDE.md) | Future, unexecuted multi-node plan |
@@ -95,6 +96,7 @@ bash -n scripts/*.sh tests/*.sh
 bash tests/test-compose-env.sh
 bash tests/test-docs-contract.sh
 bash tests/test-image-pins.sh
+bash tests/test-security-contract.sh
 bash tests/test-backup-postgres.sh
 bash tests/test-restore-postgres.sh
 ```

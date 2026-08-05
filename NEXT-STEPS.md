@@ -4,7 +4,22 @@ Open work only, ordered by operational value. Last verified 2026-08-05.
 Completed architecture and service state belong in [README.md](README.md);
 durable failure modes belong in [CLAUDE.md](CLAUDE.md).
 
-## 1. Establish real disaster recovery
+## 1. Rotate credentials exposed during local hardening
+
+On 2026-08-05, a production Compose validation command printed resolved
+environment values into a private Codex task transcript. No values were
+committed or pushed, but treat every credential in `.env` and `.env.adjutant`
+as exposed to that transcript.
+
+Rotate external credentials first (Anthropic and Cloudflare), then coordinate
+internal database passwords, JWT secrets, and shared service bearer tokens so
+every producer/consumer is updated together. Recreate only affected services,
+verify health after each group, and invalidate old credentials where the
+provider supports it. Never print the resolved Compose model while doing this.
+
+File permissions have already been contained at `0600`; rotation remains open.
+
+## 2. Establish real disaster recovery
 
 PostgreSQL backup and disposable restore testing are live, but the dumps share
 CT110's physical disk. When USB or network storage is available:
@@ -16,7 +31,7 @@ CT110's physical disk. When USB or network storage is available:
 
 Until that succeeds, same-host dumps are recovery staging only.
 
-## 2. Normalize the CT110 deployment checkout
+## 3. Normalize the CT110 deployment checkout
 
 `/opt/homelab` has a local commit and uncommitted bring-up changes, including
 runtime configuration that must not be lost. It also still uses an HTTPS Git
@@ -33,7 +48,7 @@ remote. Reconcile it deliberately:
 Do not solve this with `reset --hard`, `checkout --`, or deletion of the live
 directory.
 
-## 3. Add the first approval-gated infrastructure action
+## 4. Add the first approval-gated infrastructure action
 
 Create a least-privilege Proxmox API token with the `PVEAuditor` role and add a
 read-only Adjutant tool first. When the first mutation is introduced—likely a
@@ -41,24 +56,21 @@ targeted container restart—implement runner resumption after
 `POST /approvals/{id}/resolve`. The API records decisions today but does not
 resume blocked work, and no registered tool currently uses the `APPROVAL` tier.
 
-Document the trust boundary for Beszel's read-only Docker socket in the same
-hardening phase.
-
-## 4. Finish content automation
+## 5. Finish content automation
 
 - Seed a non-markets/non-fantasy morning briefing schedule using Miniflux.
 - Wire OpenClaw article publishing to the dashboard's real
   `POST /api/ingest/articles` route.
 - Confirm Miniflux's first login/API token if it has not already been completed.
 
-## 5. Complete Fantasy Edge identity reconciliation
+## 6. Complete Fantasy Edge identity reconciliation
 
 Fantasy Edge's `/props` data is live and used today, but ranking endpoints
 remain empty until historical and live-synced `Team` rows share identity. This
 work belongs in the Fantasy Edge repository and must be verified there before
 the dashboard or Adjutant treats ranking output as populated.
 
-## 6. Publish Wellthread web
+## 7. Publish Wellthread web
 
 `ghcr.io/camptwright/wellthread-web:latest` currently returns `403` to
 anonymous manifest inspection. The service stays in Compose profile `pending`.
