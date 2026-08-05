@@ -12,6 +12,6 @@ authoritative home for each kind of project information.
 - [x] Reframe setup, prompt, cluster, and agent documentation by purpose.
 - [x] Add documentation contract tests for required files/links and retired
   stale claims.
-- [ ] Run all repository tests and GitHub Actions.
-- [ ] Install documentation-only changes, advance the parent pin, and report
+- [x] Run all repository tests and GitHub Actions.
+- [x] Install documentation-only changes, advance the parent pin, and report
   any remaining external blockers accurately.
