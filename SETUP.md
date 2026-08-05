@@ -323,7 +323,32 @@ bump.
 
 ## Backups (do not skip)
 
-- Proxmox: nightly vzdump of all LXCs to a USB disk (Datacenter > Backup).
-- Postgres: nightly `pg_dumpall` cron inside docker-core to a directory included in vzdump:
-  `docker compose exec -T postgres pg_dumpall -U postgres | gzip > /opt/backups/pg-$(date +%F).sql.gz`
-- Vaultwarden volume: included in vzdump automatically, but test a restore once before trusting it with passwords.
+Postgres recovery staging is installed on CT110 as
+`homelab-postgres-backup.timer`. It runs nightly at 02:15 in the LXC's local
+timezone, catches up after missed runs, and retains fourteen days of compressed
+cluster dumps plus SHA-256 checksums under `/opt/backups/postgres`.
+
+```bash
+# Confirm the schedule and inspect the last run.
+systemctl status homelab-postgres-backup.timer
+journalctl -u homelab-postgres-backup.service --since yesterday
+
+# Create a backup immediately.
+systemctl start homelab-postgres-backup.service
+
+# Verify the newest dump by restoring it into a disposable Postgres container.
+/opt/homelab/scripts/restore-test-postgres.sh
+```
+
+The backup script publishes a final filename only after the gzip stream passes
+validation. The restore test also verifies the checksum and confirms the
+`adjutant`, `dashboard`, `markets`, `miniflux`, and `wellthread` databases exist
+after import. Dumps include database role password hashes, so the directory is
+root-only and its contents must be handled as secrets.
+
+**This is not disaster recovery.** The dumps currently live on the same host
+and physical storage as Postgres. When USB or network storage becomes
+available, replicate completed dump/checksum pairs off-host and configure
+Proxmox `vzdump` to that external target for full-LXC coverage. Include
+stateful non-Postgres volumes such as Vaultwarden in that plan and perform a
+real external restore test before trusting it.

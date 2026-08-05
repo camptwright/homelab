@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly homelab Postgres cluster backup
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=homelab-postgres-backup.service
+
+[Install]
+WantedBy=timers.target
