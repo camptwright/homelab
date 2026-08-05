@@ -7,7 +7,7 @@ trap 'rm -rf -- "$test_root"' EXIT
 
 mkdir -p "$test_root/bin" "$test_root/backups"
 dump="$test_root/backups/pg-20260805T120000Z.sql.gz"
-printf '%s\n' '-- fake cluster dump' 'SELECT 1;' | gzip -9 >"$dump"
+printf '%s\n' '-- fake cluster dump' 'CREATE ROLE postgres;' 'SELECT 1;' | gzip -9 >"$dump"
 (cd "$(dirname "$dump")" && sha256sum "$(basename "$dump")" >"$(basename "$dump").sha256")
 
 cat >"$test_root/bin/docker" <<'FAKE_DOCKER'
@@ -18,7 +18,7 @@ set -Eeuo pipefail
 case "${1:-}" in
   run)
     if [[ "$*" != *'--tmpfs /var/lib/postgresql/data'* ||
-          "$*" != *'-e POSTGRES_USER=restore_admin'* ||
+          "$*" == *'POSTGRES_USER='* ||
           "$*" != *'pgvector/pgvector:pg16'* ]]; then
       exit 64
     fi
@@ -26,12 +26,14 @@ case "${1:-}" in
     printf 'fake-container-id\n'
     ;;
   exec)
-    if [[ "$*" == *'pg_isready -U restore_admin'* ]]; then
+    if [[ "$*" == *'pg_isready -U postgres'* ]]; then
       [[ -e "$DOCKER_STATE" ]]
-    elif [[ "$*" == *'psql -v ON_ERROR_STOP=1 -U restore_admin'* ]]; then
+    elif [[ "$*" == *'psql -v ON_ERROR_STOP=1 -U postgres'* ]]; then
       [[ " $* " == *' -i '* ]]
-      grep -q 'SELECT 1;' /dev/stdin
-    elif [[ "$*" == *'psql -At -U restore_admin'* ]]; then
+      restored_sql=$(cat)
+      grep -q 'SELECT 1;' <<<"$restored_sql"
+      ! grep -q '^CREATE ROLE postgres;$' <<<"$restored_sql"
+    elif [[ "$*" == *'psql -At -U postgres'* ]]; then
       printf '%s\n' adjutant dashboard markets miniflux wellthread
     else
       exit 64

@@ -130,10 +130,10 @@ The script must:
 1. Resolve the supplied dump or newest `pg-*.sql.gz` under `BACKUP_DIR`.
 2. Require and verify `<dump>.sha256` from inside its directory.
 3. Run `gzip -t`.
-4. Start `pgvector/pgvector:pg16` with a unique name, `POSTGRES_HOST_AUTH_METHOD=trust`, and `--tmpfs /var/lib/postgresql/data`.
+4. Start `pgvector/pgvector:pg16` with a unique name, `POSTGRES_HOST_AUTH_METHOD=trust`, and `--tmpfs /var/lib/postgresql/data`, using the image's normal `postgres` bootstrap superuser.
 5. Register an EXIT trap that runs `docker rm -f` for the disposable container.
 6. Poll `pg_isready -U postgres` for at most 30 seconds.
-7. Stream `gzip -cd "$dump"` into `docker exec -i <container> psql -v ON_ERROR_STOP=1 -U postgres`.
+7. Stream `gzip -cd "$dump"` through `sed '/^CREATE ROLE postgres;$/d'` and into `docker exec -i <container> psql -v ON_ERROR_STOP=1 -U postgres`. This removes only the role creation that conflicts with the image's bootstrap superuser; the stored dump remains unchanged and its following `ALTER ROLE postgres ...` statement still restores the production attributes.
 8. Query `pg_database` and fail unless all five expected application databases exist.
 9. Print the verified dump path without printing SQL or role data.
 

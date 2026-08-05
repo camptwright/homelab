@@ -40,6 +40,12 @@ expected application databases exist. Its cleanup trap removes the temporary
 container on success or failure. It never connects the disposable database to
 the production Postgres volume.
 
+The disposable image bootstraps its required `postgres` superuser before SQL
+can be replayed. The restore stream therefore removes exactly the standalone
+`CREATE ROLE postgres;` statement from `pg_dumpall`; the following `ALTER ROLE
+postgres ...` statement and every other dump statement are replayed unchanged.
+The stored dump and checksum are never modified.
+
 `systemd/homelab-postgres-backup.service` runs the backup script as a oneshot
 root service. `systemd/homelab-postgres-backup.timer` runs it nightly at 02:15
 in CT110's local timezone and uses a persistent timer so a missed run occurs
