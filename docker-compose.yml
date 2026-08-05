@@ -307,7 +307,7 @@ services:
   adjutant:
     <<: *small
     profiles: [adjutant]
-    image: ghcr.io/camptwright/adjutant:sha-4db4528201b7cb495cb28065e94d63be0bc8130d@sha256:b7a86c1f53d7c715e453a0531893089cc28e4809b81e176e2462acd22b8e002e
+    image: ghcr.io/camptwright/adjutant:sha-e90aa13d372040560dda90dc5945680de503ce26@sha256:84cfa60ddfe493055200568f206da99a68ffc9bbc6d6821f41f5ca79e8c20bf3
     env_file: [.env.adjutant]
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 512m
