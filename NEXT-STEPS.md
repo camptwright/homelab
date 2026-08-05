@@ -1,60 +1,55 @@
 # NEXT-STEPS.md
 
-Living status note. Last updated **2026-08-03**, mid-way through building
-a new "markets" stack (marketdesk service + dashboard stocks tile +
-Adjutant markets sub-agent) — written early because a session usage limit
-was imminent. See `homelab-dashboard/NEXT-STEPS.md` Part 6 and
-`marketdesk/NEXT-STEPS.md` for the full detail; this is the homelab-repo-
-specific slice.
+Living status note. Last updated **2026-08-04**. See `CLAUDE.md`'s
+"Current State / Roadmap" section for the authoritative day-to-day summary
+and the operational-lessons list for failure modes already hit and fixed.
+This file is the shorter "what's actually left" slice.
 
-## Done this session (see CLAUDE.md for the full lesson writeups)
+## Done (markets + fantasy stack, end to end)
 
-- Fixed `beszel-agent` crash loop (wrong key format), linkding login
-  (stale superuser password vs a persistent volume), the dashboard's
-  never-migrated database (zero tables existed), and a missing `DOMAIN`
-  env var that broke every quick-link.
-- `dashboard`'s System tile now does real Beszel + Uptime Kuma reads
-  (was a hardcoded placeholder before) — needed `BESZEL_API_EMAIL`/
-  `BESZEL_API_PASSWORD` (new dedicated service account) and
-  `UPTIME_KUMA_STATUS_SLUG` added to `.env` and `docker-compose.yml`.
-  Both already live on CT 110.
-- `markets` Postgres user + database created live on CT 110's shared
-  Postgres (one-time `CREATE USER`/`CREATE DATABASE`/`ALTER USER`),
-  `MARKETS_DB_PASSWORD` generated and in `.env`. **This has NOT been added
-  to `postgres-init.sql` yet** — a fresh install of this stack would not
-  get the `markets` role/db automatically; needs the same treatment as
-  `wellthread`'s roles (see CLAUDE.md's `postgres-init.sql` lesson).
+- `marketdesk` built, tested, and deployed live on CT110 (profile `apps`,
+  `mem_limit: 384m`, own `markets` Postgres db/user - already in
+  `postgres-init.sql` and `env.example`). Consumed for real by both the
+  dashboard's Stocks tile and Adjutant's markets agent.
+- `adjutant` built, tested, and deployed live on CT110 (profile
+  `adjutant`). Three agents: `infra`, `markets`, and `fantasy`. Two
+  markets schedules plus a `fantasy_recap` schedule are seeded and
+  running. All three verified end-to-end against real infra with real
+  published articles landing in the dashboard's Postgres.
+- Dashboard's Stocks tile (`/stocks`) and Fantasy tile (`/fantasy`) are
+  both live and consuming their real backing APIs, not placeholders.
+- The fantasy agent's article-publishing bug (empty-endpoint tool
+  selection, then the model skipping `post_article` entirely) is fixed
+  with a mechanical runner-level nudge - see `adjutant/NEXT-STEPS.md` for
+  the full investigation.
 
-## Not done yet — needed before the markets stack is real
+## Not done yet
 
-1. **`docker-compose.yml` does not have a `marketdesk` service block.**
-   The exact block (env vars, `mem_limit: 384m`, `depends_on: postgres
-   healthy`) is specified in the original request that started this work
-   — add it under `profiles: [apps]` once the marketdesk image is
-   actually buildable and pushed to GHCR (see `marketdesk/NEXT-STEPS.md`
-   for what's still missing there first).
-2. **`MARKETS_API_TOKEN` does not exist in `.env` yet** (only
-   `MARKETS_DB_PASSWORD` does). Generate with `openssl rand -hex 32` and
-   add it before wiring the compose block.
-3. **`postgres-init.sql`** needs the `markets` user/database/grants added
-   for fresh installs, mirroring the live commands already run.
-4. **`env.example`** needs `MARKETS_DB_PASSWORD`, `MARKETS_API_TOKEN`,
-   `FINNHUB_API_KEY`, `ALPHAVANTAGE_API_KEY` documented (all currently
-   absent from the template).
-
-## A hard blocker surfaced this session, not yet resolved
-
-**Adjutant does not exist as a codebase anywhere** — confirmed absent both
-locally (`~/code/`) and on GitHub under every name I could plausibly guess
-(`adjutant`, `adjutant-agent`, `camp-adjutant`, `homelab-adjutant`, all
-404). Homelab's own `CLAUDE.md` describes it in the "Related Repos"
-section as if it's an existing project with `PROMPTS.md` 1-9 already
-written, but the roadmap section of the same file says "Adjutant Phase 1"
-is still a future step — it's aspirational documentation, not a
-description of something that exists. Before any further work references
-Adjutant as if it's a real codebase to extend, this needs to be
-reconciled: either point me at the actual location, or confirm it needs
-to be built from scratch (a large, separate undertaking — see the
-original markets-sub-agent request for the shape it would need: shared
-runner, SYSTEM.md convention, tool tiers, an orchestrator, a schedules
-table).
+1. **GHCR package visibility is unconfirmed for `dashboard`, `marketdesk`,
+   and `adjutant` alike.** All three were deployed by building the image
+   directly from source on the LXC, because `docker pull
+   ghcr.io/camptwright/<image>:latest` returned `unauthorized` and fixing
+   it needed a `gh auth refresh` that couldn't complete a browser
+   confirmation in a non-interactive session. Before trusting a plain
+   `docker compose pull && up -d` on any future redeploy of these three
+   services, make each GHCR package public via the GitHub UI (Settings ->
+   Package -> Change visibility) or complete the interactive `gh auth
+   refresh` with `read:packages` scope, then verify the pull actually
+   succeeds.
+2. **No Proxmox integration for the infra agent.** `PROXMOX_TOKEN_ID`/
+   `PROXMOX_TOKEN_SECRET` are documented in `.env.adjutant`'s contract but
+   nothing consumes them yet. Needs a hand-made PVEAuditor API token.
+3. **No AUTO-resumption of an `APPROVAL`-tier task.** `POST
+   /approvals/{id}/resolve` records the human decision but doesn't
+   re-enter the paused runner loop - unexercised today since nothing
+   registered is `APPROVAL`-tier. Build this alongside the first tool
+   that actually needs approval (likely "restart a container" once the
+   Proxmox integration lands).
+4. **Fantasy Edge's team-identity reconciliation (its own constraint #24)
+   is filed but not started.** `/rankings/{sport}` stays empty until
+   historical and live-synced `Team` rows share identity. Doesn't block
+   the current fantasy agent (it reads `/props`, not `/rankings`) but
+   will need doing before Fantasy Edge's own ranking-based output is
+   trustworthy.
+5. **Morning briefing schedule for non-markets/non-fantasy sources** and
+   OpenClaw ingest wiring are still future work (SETUP.md Part B3/B4).
