@@ -41,6 +41,9 @@ gzip -t "$dump"
 (cd "$test_root/backups" && sha256sum -c "$(basename "$dump").sha256")
 [[ $(file_mode "$test_root/backups") == 700 ]]
 [[ $(file_mode "$dump") == 600 ]]
-[[ ! -e "$test_root/backups/.pg-"*'.tmp' ]]
+shopt -s nullglob
+temporary_dumps=("$test_root/backups"/.pg-*.tmp)
+shopt -u nullglob
+[[ ${#temporary_dumps[@]} -eq 0 ]]
 
 printf 'backup behavior verified\n'
