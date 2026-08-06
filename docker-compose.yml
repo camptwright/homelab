@@ -306,6 +306,14 @@ services:
     # src/agents/tools/proxmox.py in the adjutant repo. Public CA cert,
     # not a secret; safe to commit.
     volumes: ["./proxmox-ca.pem:/app/proxmox-ca.pem:ro"]
+    # The cert's SANs are 192.168.1.191/reekserver/reekserver.local, not
+    # the 10.51.24.34 address this whole stack otherwise reaches the
+    # Proxmox host through (two subnets, one host) - TLS then fails on a
+    # hostname mismatch even with the right CA. Rather than depend on
+    # 192.168.1.191 being routable from this container, pin the SAN's own
+    # hostname to the address that's already known-reachable so SNI/cert
+    # validation matches without touching the network path at all.
+    extra_hosts: ["reekserver:10.51.24.34"]
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 512m
 

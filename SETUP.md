@@ -174,7 +174,7 @@ briefs). Markets and fantasy tools cannot execute trades or bets.
    DASHBOARD_INGEST_URL=http://dashboard:3000/api/ingest/articles
    ARTICLE_INGEST_TOKEN=<same as ARTICLE_INGEST_TOKEN in .env>
    UPTIME_KUMA_STATUS_URL=https://status.<domain>/api/status-page/<slug>
-   PROXMOX_URL=https://<proxmox-host>:8006/api2/json
+   PROXMOX_URL=https://reekserver:8006/api2/json  # must match a cert SAN - see the extra_hosts note in docker-compose.yml
    PROXMOX_NODE=<pve node name, e.g. `pvesh get /nodes`>
    PROXMOX_TOKEN_ID=adjutant@pve!adjutant
    PROXMOX_TOKEN_SECRET=<see below>
