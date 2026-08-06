@@ -70,14 +70,6 @@ remain empty until historical and live-synced `Team` rows share identity. This
 work belongs in the Fantasy Edge repository and must be verified there before
 the dashboard or Adjutant treats ranking output as populated.
 
-## 7. Publish Wellthread web
-
-`ghcr.io/camptwright/wellthread-web:latest` currently returns `403` to
-anonymous manifest inspection. The service stays in Compose profile `pending`.
-After its package exists and is pullable, use its source-commit tag plus digest,
-remove the sole exception in `tests/test-image-pins.sh`, move it to `apps`, and
-verify the gateway and public application end to end.
-
 ## Future hardware
 
 - HP EliteDesk nodes: validate and execute [K8S-CLUSTER-GUIDE.md](K8S-CLUSTER-GUIDE.md).

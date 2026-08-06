@@ -14,20 +14,20 @@ code remains in its own repositories.
 | Profile | Services | State |
 |---|---|---|
 | `core` | PostgreSQL/pgvector, Redis, LiteLLM, cloudflared, ntfy, Ollama embeddings | Live |
-| `apps` | dashboard, Miniflux, Uptime Kuma, Linkding, Marketdesk, Beszel hub/agent, Wellthread auth/REST/gateway | Live |
+| `apps` | dashboard, Miniflux, Uptime Kuma, Linkding, Marketdesk, Beszel hub/agent, Wellthread auth/REST/gateway/web | Live |
 | `adjutant` | single FastAPI + APScheduler container | Live |
 | `extras` | Vaultwarden, Actual Budget, WhoDB | Available, not enabled |
 | `media` | Jellyfin | Future Intel/Quick Sync node |
-| `pending` | Wellthread web | Disabled until its GHCR package exists |
 
 The shared PostgreSQL instance has separate databases and roles for Adjutant,
 the dashboard, Marketdesk, Miniflux, and Wellthread. LiteLLM is the only LLM
 gateway: `fast` and `worker` are local-first, `planner` is cloud, and `embed`
 uses the CT110 Ollama sidecar.
 
-The three in-house application images—dashboard, Marketdesk, and Adjutant—are
-public on GHCR and deployed successfully. Compose pins their source-commit tags
-and every other production-capable image to immutable registry digests.
+The four in-house application images—dashboard, Marketdesk, Adjutant, and
+Wellthread web—are public on GHCR and deployed successfully. Compose pins
+their source-commit tags and every other production-capable image to
+immutable registry digests.
 
 ## Related repositories
 

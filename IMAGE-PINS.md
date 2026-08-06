@@ -9,15 +9,6 @@ The pins captured on 2026-08-05 match the image objects already running on
 CT110. Applying this file therefore does not require a restart: the next normal
 recreation will use the same bytes through the immutable reference.
 
-## Pending exception
-
-`ghcr.io/camptwright/wellthread-web:latest` is the sole allowed exception. The
-package currently returns `403 Forbidden` to anonymous manifest inspection and
-the service is isolated in profile `pending`, so it is not part of production.
-Once its first public image exists, replace `latest` with its source-SHA tag and
-digest, move the service to `apps`, and remove the exception from
-`tests/test-image-pins.sh` in the same commit.
-
 ## Updating one image
 
 1. Read the release notes and choose the target tag; do not advance an entire
