@@ -267,7 +267,7 @@ services:
   wellthread-web:
     <<: *small
     profiles: [apps]
-    image: ghcr.io/camptwright/wellthread-web:sha-ae976b6cc1998e2a5418ac1617864c4b6b879811@sha256:61c294a249b09db507a1c2edca74cd6309e34628af02e815da98eb76576df968
+    image: ghcr.io/camptwright/wellthread-web:sha-b4efbbe8ffb6c827fbc14052ee6f71f3920c2c85@sha256:13253c74c156f54a0a1ba53f3c3743aba8acde2f99a7cbaa9f34412afdee09dc
     environment:
       # Server-side rendering stays on the docker network instead of hairpinning
       # out through Cloudflare and back. The browser uses the public origin,
