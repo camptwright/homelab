@@ -300,8 +300,12 @@ services:
   adjutant:
     <<: *small
     profiles: [adjutant]
-    image: ghcr.io/camptwright/adjutant:sha-e90aa13d372040560dda90dc5945680de503ce26@sha256:84cfa60ddfe493055200568f206da99a68ffc9bbc6d6821f41f5ca79e8c20bf3
+    image: ghcr.io/camptwright/adjutant:sha-ca2fac58ace059d9c5aa5189ae548c992ff390a9@sha256:ec2132a9f6506dbd522c3473becee8cfee97743274666e0f0c2c7840f6dbb403
     env_file: [.env.adjutant]
+    # Proxmox's self-signed cert, pinned rather than verify=False - see
+    # src/agents/tools/proxmox.py in the adjutant repo. Public CA cert,
+    # not a secret; safe to commit.
+    volumes: ["./proxmox-ca.pem:/app/proxmox-ca.pem:ro"]
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 512m
 

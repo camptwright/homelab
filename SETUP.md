@@ -174,10 +174,30 @@ briefs). Markets and fantasy tools cannot execute trades or bets.
    DASHBOARD_INGEST_URL=http://dashboard:3000/api/ingest/articles
    ARTICLE_INGEST_TOKEN=<same as ARTICLE_INGEST_TOKEN in .env>
    UPTIME_KUMA_STATUS_URL=https://status.<domain>/api/status-page/<slug>
+   PROXMOX_URL=https://<proxmox-host>:8006/api2/json
+   PROXMOX_NODE=<pve node name, e.g. `pvesh get /nodes`>
+   PROXMOX_TOKEN_ID=adjutant@pve!adjutant
+   PROXMOX_TOKEN_SECRET=<see below>
+   PROXMOX_CA_CERT_PATH=/app/proxmox-ca.pem
    ```
-   `PROXMOX_TOKEN_ID`/`PROXMOX_TOKEN_SECRET` (Datacenter > Permissions >
-   API Tokens, `PVEAuditor` role only) are for a future infra tool beyond
-   Uptime Kuma - not consumed by anything yet, so skip them for now.
+   The infra agent's `proxmox_status`/`restart_container` tools need a
+   dedicated `adjutant@pve` user with two ACLs at `/` - `PVEAuditor`
+   (read-only) plus a custom `VM.PowerMgmt`-only role, since PVEAuditor
+   alone can read status but can't actually reboot anything:
+   ```bash
+   pveum user add adjutant@pve
+   pveum role add AdjutantContainerRestart -privs VM.PowerMgmt
+   pveum acl modify / -users adjutant@pve -roles PVEAuditor
+   pveum acl modify / -users adjutant@pve -roles AdjutantContainerRestart
+   pveum user token add adjutant@pve adjutant --privsep 1
+   ```
+   The token secret is shown exactly once at creation - paste it
+   straight into `.env.adjutant`, never into a shell history or log.
+   Export the node's self-signed CA once (`ssh root@<proxmox-host> cat
+   /etc/pve/pve-root-ca.pem`) and commit it to this repo as
+   `proxmox-ca.pem` (a public CA cert, not a secret) - the adjutant
+   service bind-mounts it read-only rather than disabling TLS
+   verification.
 3. `docker compose --profile core --profile apps --profile adjutant up -d`
    then run migrations once (creates `tasks`/`runs`/`approvals`/`schedules`
    and seeds `premarket_brief`, `portfolio_recap`, and `fantasy_recap`):
