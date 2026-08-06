@@ -87,7 +87,7 @@ services:
   cloudflared:
     <<: *small
     profiles: [core]
-    image: cloudflare/cloudflared:latest@sha256:e39ee8da81ad5e05d77f38d2f51c60ca51bf2a8450ac3abab50c17fdb91d91bf
+    image: cloudflare/cloudflared:2026.7.3@sha256:e39ee8da81ad5e05d77f38d2f51c60ca51bf2a8450ac3abab50c17fdb91d91bf
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
@@ -96,7 +96,7 @@ services:
   ntfy:
     <<: *small
     profiles: [core]
-    image: binwiederhier/ntfy:latest@sha256:081b53dbb20674fcfe05fdb4eb8af9036a2645ef979543d16f7f80803af467b1
+    image: binwiederhier/ntfy:v2.26.3@sha256:081b53dbb20674fcfe05fdb4eb8af9036a2645ef979543d16f7f80803af467b1
     command: ["serve"]
     environment:
       NTFY_BASE_URL: https://ntfy.${DOMAIN}
@@ -113,7 +113,7 @@ services:
   ollama-embed:
     <<: *small
     profiles: [core]
-    image: ollama/ollama:latest@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
+    image: ollama/ollama:0.32.5@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
     volumes: [ollamaembed:/root/.ollama]
     mem_limit: 1024m
 
@@ -146,7 +146,7 @@ services:
   miniflux:
     <<: *small
     profiles: [apps]
-    image: miniflux/miniflux:latest@sha256:49d7b60987616387c306a8023087b31f2c9b7b21288b523026cb04058e8b6dbb
+    image: miniflux/miniflux:2.3.3@sha256:49d7b60987616387c306a8023087b31f2c9b7b21288b523026cb04058e8b6dbb
     environment:
       DATABASE_URL: postgres://miniflux:${MINIFLUX_DB_PASSWORD}@postgres:5432/miniflux?sslmode=disable
       RUN_MIGRATIONS: 1
@@ -167,7 +167,7 @@ services:
   linkding:
     <<: *small
     profiles: [apps]
-    image: sissbruecker/linkding:latest@sha256:61b2eb9eed8e5772a473fb7f1f8923e046cb8cbbeb50e88150afd5ff287d4060
+    image: sissbruecker/linkding:1.45.0@sha256:61b2eb9eed8e5772a473fb7f1f8923e046cb8cbbeb50e88150afd5ff287d4060
     environment:
       LD_SUPERUSER_NAME: camp
       LD_SUPERUSER_PASSWORD: ${LINKDING_PASSWORD}
@@ -190,13 +190,13 @@ services:
   beszel:
     <<: *small
     profiles: [apps]
-    image: henrygd/beszel:latest@sha256:a849ad80814b6a1a3be665304dcace5d4854b3bed7bde4dd1227e8ce1b82d477
+    image: henrygd/beszel:0.18.7@sha256:a849ad80814b6a1a3be665304dcace5d4854b3bed7bde4dd1227e8ce1b82d477
     volumes: [beszel:/beszel_data]
     mem_limit: 128m
 
   beszel-agent:
     profiles: [apps]
-    image: henrygd/beszel-agent:latest@sha256:8874e2c53f9de5e063a6a80d6b617e20fa593ac5dc4eb4c6ce1f912f510f38f8
+    image: henrygd/beszel-agent:0.18.7@sha256:8874e2c53f9de5e063a6a80d6b617e20fa593ac5dc4eb4c6ce1f912f510f38f8
     restart: unless-stopped
     read_only: true
     tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
@@ -255,7 +255,7 @@ services:
   wellthread-rest:
     <<: *small
     profiles: [apps]
-    image: postgrest/postgrest:v12.2.3@sha256:729bf65c733b73f5b52777f0e4b853f22ed73aa67a22d38269d289779b0a8401
+    image: postgrest/postgrest:v14.12@sha256:54000f24847d01a2c2302e0041cf0618b875c57fb48507d743cfa9aaa50bf43c
     environment:
       # Logs in as `authenticator`, which has no rights of its own and
       # SET ROLEs per-request from the JWT. Row isolation is enforced by the
@@ -265,14 +265,13 @@ services:
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       PGRST_JWT_AUD: authenticated
-      PGRST_DB_USE_LEGACY_GUCS: "false"
+      # Enables /ready, which checks both the connection pool and schema cache.
+      PGRST_ADMIN_SERVER_PORT: "3001"
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 256m
     healthcheck:
-      # v12.2.3 is a shell-free image and predates `postgrest --ready`.
-      # Process liveness plus the healthy-Postgres dependency is the strongest
-      # probe supported without replacing the reviewed image.
-      test: ["CMD", "postgrest", "--version"]
+      # Native v14 probe requests the running admin server's /ready endpoint.
+      test: ["CMD", "postgrest", "--ready"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -322,7 +321,7 @@ services:
   vaultwarden:
     <<: *small
     profiles: [extras]
-    image: vaultwarden/server:latest@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
+    image: vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8
     environment:
       DOMAIN: https://vault.${DOMAIN}
       SIGNUPS_ALLOWED: "false"   # set true for first signup, then back to false
@@ -332,14 +331,14 @@ services:
   actualbudget:
     <<: *small
     profiles: [extras]
-    image: actualbudget/actual-server:latest@sha256:0b300f370dba85a74998a953736a831bd931cc8cb76c0d8ceac3d3fd288dfd4d
+    image: actualbudget/actual-server:26.8.0@sha256:0b300f370dba85a74998a953736a831bd931cc8cb76c0d8ceac3d3fd288dfd4d
     volumes: [actualbudget:/data]
     mem_limit: 256m
 
   whodb:
     <<: *small
     profiles: [extras]
-    image: clidey/whodb:latest@sha256:0f75d6bd4fb933c97f37a9f5400fdecc02bb0c43399ffcb492f8b57baa2a4a03
+    image: clidey/whodb:0.123.0@sha256:0f75d6bd4fb933c97f37a9f5400fdecc02bb0c43399ffcb492f8b57baa2a4a03
     mem_limit: 256m
 
   # ------------------------------------------------- media (FUTURE: HP node) ----
@@ -348,7 +347,7 @@ services:
   jellyfin:
     <<: *small
     profiles: [media]
-    image: jellyfin/jellyfin:latest@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
+    image: jellyfin/jellyfin:10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
     volumes:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache

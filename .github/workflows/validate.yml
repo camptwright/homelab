@@ -22,7 +22,9 @@ jobs:
           bash tests/test-compose-env.sh
           bash tests/test-docs-contract.sh
           bash tests/test-image-pins.sh
+          bash tests/test-image-pins-policy.sh
           bash tests/test-security-contract.sh
+          bash tests/test-wellthread-readiness.sh
           bash tests/test-backup-postgres.sh
           bash tests/test-restore-postgres.sh
 

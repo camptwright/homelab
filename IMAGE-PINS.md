@@ -10,6 +10,11 @@ web's public source-SHA image was verified anonymously before its production
 profile promotion. Applying a changed pin is a separate controlled operation;
 this policy does not authorize recreating a live service.
 
+PostgREST is pinned to `v14.12` because its native `postgrest --ready` command
+queries the running admin server's `/ready` endpoint, which checks both the
+database connection pool and schema cache. The public multi-platform tag was
+resolved anonymously from Docker Hub before its digest was committed.
+
 ## Updating one image
 
 1. Read the release notes and choose the target tag; do not advance an entire
