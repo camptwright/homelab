@@ -11,13 +11,35 @@ environment values into a private Codex task transcript. No values were
 committed or pushed, but treat every credential in `.env` and `.env.adjutant`
 as exposed to that transcript.
 
-Rotate external credentials first (Anthropic and Cloudflare), then coordinate
-internal database passwords, JWT secrets, and shared service bearer tokens so
-every producer/consumer is updated together. Recreate only affected services,
-verify health after each group, and invalidate old credentials where the
-provider supports it. Never print the resolved Compose model while doing this.
+**Internal rotation complete (2026-08-06):** all 8 Postgres role passwords
+(`POSTGRES_SUPER_PASSWORD`, `ADJUTANT_DB_PASSWORD`, `DASHBOARD_DB_PASSWORD`,
+`MINIFLUX_DB_PASSWORD`, `MARKETS_DB_PASSWORD`, `WELLTHREAD_DB_PASSWORD`,
+`AUTHENTICATOR_PASSWORD`, `AUTH_ADMIN_PASSWORD`), `BESZEL_API_PASSWORD`,
+the shared bearer tokens (`ADJUTANT_API_TOKEN`/`API_BEARER_TOKEN`,
+`ARTICLE_INGEST_TOKEN`, `MARKETS_API_TOKEN`), and `SUPABASE_JWT_SECRET`
+(plus its derived `SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY`, which
+required a `wellthread-web` rebuild since the anon key is baked into the
+client bundle at build time) were rotated on live CT110 and verified —
+every service reconnected clean, and the new anon JWT was confirmed accepted
+by PostgREST before/after cutover. New values were generated and installed
+entirely server-side and never printed to any transcript.
 
-File permissions have already been contained at `0600`; rotation remains open.
+**Deliberately not rotated:**
+
+- `LITELLM_API_KEY` — the LiteLLM master key is shared with OpenClaw, a
+  system outside this workspace with no config reachable from here.
+  Rotating it would 401 every OpenClaw call until its config is updated in
+  lockstep. Do this the next time an OpenClaw-side change is already
+  planned, so both sides move together.
+- `MINIFLUX_ADMIN_PASSWORD`, `MINIFLUX_TOKEN`, `LINKDING_PASSWORD` —
+  single-consumer human-login credentials (not producer/consumer pairs
+  needing coordination). Rotate directly in each app's UI: Miniflux
+  Settings → change password, then Settings → API keys → regenerate →
+  update `.env`; Linkding via its own login settings.
+
+**Still open:** external credential rotation (Anthropic, Cloudflare) —
+tracked separately, not done from this environment. File permissions were
+already contained at `0600` prior to this rotation.
 
 ## 2. Establish real disaster recovery
 
