@@ -5,18 +5,10 @@ tag keeps the intended release channel readable; the digest makes deployments
 and rollbacks immutable. For images built in Camp's repositories, the tag is
 the full `sha-<git-commit>` tag emitted by GitHub Actions.
 
-The pins captured on 2026-08-05 match the image objects already running on
-CT110. Applying this file therefore does not require a restart: the next normal
-recreation will use the same bytes through the immutable reference.
-
-## Pending exception
-
-`ghcr.io/camptwright/wellthread-web:latest` is the sole allowed exception. The
-package currently returns `403 Forbidden` to anonymous manifest inspection and
-the service is isolated in profile `pending`, so it is not part of production.
-Once its first public image exists, replace `latest` with its source-SHA tag and
-digest, move the service to `apps`, and remove the exception from
-`tests/test-image-pins.sh` in the same commit.
+The pins captured on 2026-08-05 match the reviewed image objects. Wellthread
+web's public source-SHA image was verified anonymously before its production
+profile promotion. Applying a changed pin is a separate controlled operation;
+this policy does not authorize recreating a live service.
 
 ## Updating one image
 

@@ -246,6 +246,11 @@ services:
       GOTRUE_MAILER_AUTOCONFIRM: "true"
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 192m
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9999/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   wellthread-rest:
     <<: *small
@@ -263,16 +268,19 @@ services:
       PGRST_DB_USE_LEGACY_GUCS: "false"
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 256m
+    healthcheck:
+      # v12.2.3 is a shell-free image and predates `postgrest --ready`.
+      # Process liveness plus the healthy-Postgres dependency is the strongest
+      # probe supported without replacing the reviewed image.
+      test: ["CMD", "postgrest", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   wellthread-web:
     <<: *small
-    # `pending` until the first Actions build publishes the image: a missing
-    # GHCR image returns "denied" and one failed pull interrupts every other
-    # parallel pull in the same `up`. Flip to [apps] after CI goes green.
-    profiles: [pending]
-    # Sole unpinned exception; IMAGE-PINS.md and the CI contract require this
-    # service to remain outside production profiles until its package exists.
-    image: ghcr.io/camptwright/wellthread-web:latest
+    profiles: [apps]
+    image: ghcr.io/camptwright/wellthread-web:sha-ae976b6cc1998e2a5418ac1617864c4b6b879811@sha256:61c294a249b09db507a1c2edca74cd6309e34628af02e815da98eb76576df968
     environment:
       # Server-side rendering stays on the docker network instead of hairpinning
       # out through Cloudflare and back. The browser uses the public origin,
@@ -287,12 +295,10 @@ services:
     image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     volumes:
       - ./wellthread-gateway.conf:/etc/nginx/conf.d/default.conf:ro
-    # Deliberately does NOT depend on wellthread-web: that service sits in
-    # profile `pending`, and a depends_on pointing at an out-of-scope service
-    # fails the whole project with "depends on undefined service". Until the
-    # app image exists the gateway simply 502s on /, while /auth/v1 and
-    # /rest/v1 keep working.
-    depends_on: [wellthread-auth, wellthread-rest]
+    depends_on:
+      wellthread-auth: {condition: service_healthy}
+      wellthread-rest: {condition: service_healthy}
+      wellthread-web: {condition: service_healthy}
     mem_limit: 64m
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
