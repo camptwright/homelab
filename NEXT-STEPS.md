@@ -84,27 +84,52 @@ you're comfortable it's no longer needed as a rollback reference — it also
 still holds several `.bak` files from earlier sessions if any of those are
 ever wanted.
 
-## 4. Add the first approval-gated infrastructure action
+## 4. Add the first approval-gated infrastructure action — done (2026-08-06)
 
-Create a least-privilege Proxmox API token with the `PVEAuditor` role and add a
-read-only Adjutant tool first. When the first mutation is introduced—likely a
-targeted container restart—implement runner resumption after
-`POST /approvals/{id}/resolve`. The API records decisions today but does not
-resume blocked work, and no registered tool currently uses the `APPROVAL` tier.
+`proxmox_status` (read-only) and `restart_container` (the first real
+`APPROVAL`-tier tool) both live on Adjutant's infra agent, authenticated via
+a dedicated `adjutant@pve` Proxmox user with exactly two ACL grants
+(`PVEAuditor` read-only + a custom `VM.PowerMgmt`-only role — nothing
+broader) and TLS pinned to the node's own CA. Runner resumption after
+`POST /approvals/{id}/resolve` is built and verified live: a real restart
+request for a real running container blocked on a real `Approval` row,
+was denied through the real API, and the container's Proxmox-reported
+uptime never reset — proof the real handler never ran, and proof the
+task still reached a real conclusion instead of sitting at `pending`
+forever. See `adjutant/NEXT-STEPS.md` for the full verification detail.
 
-## 5. Finish content automation
+## 5. Finish content automation — mostly done (2026-08-06)
 
-- Seed a non-markets/non-fantasy morning briefing schedule using Miniflux.
-- Wire OpenClaw article publishing to the dashboard's real
-  `POST /api/ingest/articles` route.
-- Confirm Miniflux's first login/API token if it has not already been completed.
+- **Done:** a `briefing` sub-agent reads unread Miniflux articles and posts
+  a daily 07:00 `America/Chicago` morning briefing (`source=briefing`).
+  Verified live: real Miniflux entries pulled, a real article posted and
+  confirmed present in the dashboard's Postgres.
+- **Still open:** wiring OpenClaw's article publishing to
+  `POST /api/ingest/articles` needs no code — the route, auth, and
+  contract are already proven by the fantasy/markets/briefing agents —
+  it's purely configuring the external OpenClaw system (URL +
+  `ARTICLE_INGEST_TOKEN`), which lives outside this workspace.
+- Confirm Miniflux's first login/API token if it has not already been
+  completed (it has — the briefing agent's live verification used the
+  real configured token successfully).
 
-## 6. Complete Fantasy Edge identity reconciliation
+## 6. Complete Fantasy Edge identity reconciliation — done (2026-08-06)
 
-Fantasy Edge's `/props` data is live and used today, but ranking endpoints
-remain empty until historical and live-synced `Team` rows share identity. This
-work belongs in the Fantasy Edge repository and must be verified there before
-the dashboard or Adjutant treats ranking output as populated.
+Fixed and verified live against real Postgres on CT100: `resolve_team()`
+now backs both `seed_historical.py` and `GameSyncAgent`, crosswalking
+NFL/MLB/NHL's historical-loader identifiers to ESPN's canonical
+name/espn_id (fetched live, not from memory). 560/561 seeded NFL games
+now resolve both `home_team_id`/`away_team_id` (the one holdout predates
+the current team-abbreviation convention, a documented, narrow gap, not
+a regression). NCAAF's crosswalk remains unbuilt — its ~130-school
+roster is too large and too volatile to hand-type without live
+verification; see fantasy-edge's own CLAUDE.md for the full detail,
+including two real bugs found and fixed along the way (an NHL loader
+field that doesn't exist in the real API schema, and a YAML `NO` key
+that silently parsed as the boolean `False`). Populated `/rankings/*`
+output additionally depends on `ValueAgent` actually running against the
+now-resolved teams — not independently re-verified beyond confirming the
+resolution pipeline itself is clean end-to-end.
 
 ## Future hardware
 
