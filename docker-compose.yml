@@ -300,7 +300,7 @@ services:
   adjutant:
     <<: *small
     profiles: [adjutant]
-    image: ghcr.io/camptwright/adjutant:sha-ca2fac58ace059d9c5aa5189ae548c992ff390a9@sha256:ec2132a9f6506dbd522c3473becee8cfee97743274666e0f0c2c7840f6dbb403
+    image: ghcr.io/camptwright/adjutant:sha-07fc214a7c8e1f9a0d63e630feafdb483072011b@sha256:7e716c621a86cc667a1be9e476426f3dd14ac043decfc91295a04b4671c63136
     env_file: [.env.adjutant]
     # Proxmox's self-signed cert, pinned rather than verify=False - see
     # src/agents/tools/proxmox.py in the adjutant repo. Public CA cert,
