@@ -53,22 +53,36 @@ CT110's physical disk. When USB or network storage is available:
 
 Until that succeeds, same-host dumps are recovery staging only.
 
-## 3. Normalize the CT110 deployment checkout
+## 3. Normalize the CT110 deployment checkout — done (2026-08-06)
 
-`/opt/homelab` has a local commit and uncommitted bring-up changes, including
-runtime configuration that must not be lost. It also still uses an HTTPS Git
-remote. Reconcile it deliberately:
+`/opt/homelab` is now a clean SSH-based clone (`git@github.com-homelab:...`,
+a dedicated read-only deploy key registered on the repo — see `~/.ssh/config`
+on CT110) tracking `main` with a clean `git status`. A file-by-file diff
+against the old checkout found the drift was entirely in docs/tests/planning
+files, never in anything functional — `docker-compose.yml`, `postgres-init.sql`,
+`litellm-config.yaml`, `SETUP.md`, and `scripts/*` already matched exactly,
+confirming prior sessions' direct file pushes had kept the runtime state in
+sync even though git's own HEAD was stuck on a July 31 local commit. `.env`
+and `.env.adjutant` were copied across untouched (root-only `0600`), and
+`docker compose config` was confirmed to resolve identically before and
+after the swap (the only diff pre-swap was the absolute bind-mount path,
+which self-corrected once the clean checkout landed at `/opt/homelab`). The
+swap was a directory rename only — zero containers restarted, confirmed by
+unchanged uptimes across all 18 services.
 
-1. inventory the local commit and every changed/untracked path without printing
-   secret contents;
-2. preserve `.env` and `.env.adjutant` outside Git with root-only permissions;
-3. ensure every durable non-secret operational change exists on GitHub;
-4. create a clean SSH-backed deployment checkout or carefully converge the
-   existing one; and
-5. run the full Compose parse and health checks before retiring the old copy.
-
-Do not solve this with `reset --hard`, `checkout --`, or deletion of the live
-directory.
+**One finding needs a decision:** the old checkout (preserved, not deleted,
+at `/opt/homelab.pre-reconcile-<timestamp>`) has a local-only git commit
+(`bf96a62`, "litellm update", 2026-07-31) that committed a real `.env` into
+its `.git` history. That commit was **never pushed** — `homelab` is a public
+GitHub repo, but `bf96a62` is not reachable from `origin/main`, confirmed via
+`git merge-base --is-ancestor`. So this was never a public leak; it's local,
+root-only exposure on a single-user host, and every credential it could have
+contained was rotated in item 1 above (except the external provider keys,
+which are the user's separate responsibility). Delete
+`/opt/homelab.pre-reconcile-<timestamp>/.git` (or the whole directory) once
+you're comfortable it's no longer needed as a rollback reference — it also
+still holds several `.bak` files from earlier sessions if any of those are
+ever wanted.
 
 ## 4. Add the first approval-gated infrastructure action
 
