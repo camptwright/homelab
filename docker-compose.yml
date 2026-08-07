@@ -267,12 +267,21 @@ services:
   wellthread-web:
     <<: *small
     profiles: [apps]
-    image: ghcr.io/camptwright/wellthread-web:sha-b4efbbe8ffb6c827fbc14052ee6f71f3920c2c85@sha256:13253c74c156f54a0a1ba53f3c3743aba8acde2f99a7cbaa9f34412afdee09dc
+    image: ghcr.io/camptwright/wellthread-web:sha-386fbbdb5b40984570537f25af4f5982d8fccf7a@sha256:43354b61310b723abf95205583771d528c9807e0289936896f8b1b861ec4dbe4
     environment:
       # Server-side rendering stays on the docker network instead of hairpinning
       # out through Cloudflare and back. The browser uses the public origin,
       # which is baked in at build time as NEXT_PUBLIC_SUPABASE_URL.
       SUPABASE_INTERNAL_URL: http://wellthread-gateway:8080
+      # Same team as every other Access app (admin/rss/status/links/beszel);
+      # CF_ACCESS_AUD_WELLTHREAD is this app's own Access application AUD,
+      # distinct per application - empty until the Access application is
+      # created, at which point auto-login just stays off and /login keeps
+      # working exactly as it does today (see middleware.ts's fallback).
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD_WELLTHREAD}
+      WELLTHREAD_AUTO_LOGIN_EMAIL: ${WELLTHREAD_AUTO_LOGIN_EMAIL}
+      WELLTHREAD_AUTO_LOGIN_PASSWORD: ${WELLTHREAD_AUTO_LOGIN_PASSWORD}
     depends_on: {postgres: {condition: service_healthy}}
     mem_limit: 512m
 
