@@ -121,7 +121,7 @@ services:
   dashboard:
     <<: *small
     profiles: [apps]
-    image: ghcr.io/camptwright/homelab-dashboard:sha-e8b12d91e44e721dd50ff35979758e4891dd95bb@sha256:52acae4e2b39f1946fee1607a62338253dda0d5dbac3c6f6369eaa186d885469
+    image: ghcr.io/camptwright/homelab-dashboard:sha-bb82501922c5b7d49bfd535e751cca5141ee4a36@sha256:346ee00d5c0ac7d26a6951ded965b40ae1a13a0087a825f5333ab1a9d2bf6ca0
     environment:
       DATABASE_URL: postgresql://dashboard:${DASHBOARD_DB_PASSWORD}@postgres:5432/dashboard
       DOMAIN: ${DOMAIN}
@@ -300,7 +300,7 @@ services:
   adjutant:
     <<: *small
     profiles: [adjutant]
-    image: ghcr.io/camptwright/adjutant:sha-07fc214a7c8e1f9a0d63e630feafdb483072011b@sha256:7e716c621a86cc667a1be9e476426f3dd14ac043decfc91295a04b4671c63136
+    image: ghcr.io/camptwright/adjutant:sha-966b05a49fc804c9aabe79e5d1068b6eace70956@sha256:880b5ecb13b7c8b1af36472d361fcb7f14c12f4209851decac2f8b192255c908
     env_file: [.env.adjutant]
     # Proxmox's self-signed cert, pinned rather than verify=False - see
     # src/agents/tools/proxmox.py in the adjutant repo. Public CA cert,
