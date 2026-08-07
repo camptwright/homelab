@@ -1,8 +1,33 @@
 # Next Steps
 
-Open work only, ordered by operational value. Last verified 2026-08-05.
+Open work only, ordered by operational value. Last verified 2026-08-06.
 Completed architecture and service state belong in [README.md](README.md);
 durable failure modes belong in [CLAUDE.md](CLAUDE.md).
+
+## 0. Create the Cloudflare Access application for Wellthread
+
+`wellthread-web`'s middleware already verifies a Cloudflare Access JWT and
+auto-signs-in via a dedicated machine-only account once it sees one - the
+code and the auto-login account are both live on CT110, verified with no
+regression (site still serves `/login` exactly as before). The one thing
+left is entirely a Cloudflare dashboard action; there is no Cloudflare API
+token anywhere in this workspace to automate it, same as every other Access
+application before it:
+
+1. **Zero Trust > Access > Applications > Add application** (Self-hosted).
+   Application domain: `wellthread.<domain>`. Policy: Allow, Include >
+   Emails > your Gmail - reuse the same policy group as admin/rss/status.
+2. Open the application's **Overview** page and copy the **Application
+   Audience (AUD) tag** into `CF_ACCESS_AUD_WELLTHREAD` in `/opt/homelab/.env`
+   on CT110 (root-only, `0600` - same file every other secret already lives
+   in). `CF_ACCESS_TEAM_DOMAIN` is already set and shared with every other
+   Access application.
+3. `docker compose --profile core --profile apps up -d --force-recreate wellthread-web`
+   to pick up the new env value.
+4. Verify: visiting `https://wellthread.<domain>/` should now prompt the
+   Cloudflare Access login first, then land straight on `/today` with no
+   Wellthread login form at all. `/login` still works directly if Access is
+   ever misconfigured - it is a fallback, not removed.
 
 ## 1. Rotate credentials exposed during local hardening
 
